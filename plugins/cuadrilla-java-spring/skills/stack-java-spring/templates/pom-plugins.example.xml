@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cuadrilla java-spring: the pom.xml pieces the standard needs. Merge each section into the
+  project's pom.xml (which inherits spring-boot-starter-parent); do not copy this file as a pom.
+  Versions were current when the pack was written: check Maven Central / Context7 and keep the
+  project's pinned versions unless an upgrade is planned. Adding these is adding dependencies:
+  confirm with the user first.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+
+  <!-- ===== <properties> ===== -->
+  <properties>
+    <!-- LTS pinned here; the parent maps it to maven.compiler.release. CI uses the same number. -->
+    <java.version>25</java.version>
+    <spotless.version>3.10.4</spotless.version>
+    <palantir-java-format.version>2.102.0</palantir-java-format.version>
+    <archunit.version>1.5.1</archunit.version>
+    <jacoco.version>0.8.15</jacoco.version>
+    <dependency-check.version>13.0.0</dependency-check.version>
+  </properties>
+
+  <!-- ===== <dependencies> (test scope) ===== -->
+  <dependencies>
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <version>${archunit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Optional, for *IT repository tests: Testcontainers via Boot's managed versions
+         (spring-boot-testcontainers + the database module, e.g. testcontainers-postgresql). -->
+  </dependencies>
+
+  <!-- ===== <build><plugins> ===== -->
+  <build>
+    <plugins>
+
+      <!-- Fails fast on the wrong JDK/Maven. Version managed by the Boot parent. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-toolchain</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[${java.version},)</version>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                </requireMavenVersion>
+                <banDuplicatePomDependencyVersions/>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Formatting: ./mvnw -B spotless:check (CI) and ./mvnw spotless:apply (fix).
+           Not bound to a phase on purpose: it runs as its own check, like in component.json. -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless.version}</version>
+        <configuration>
+          <java>
+            <palantirJavaFormat>
+              <version>${palantir-java-format.version}</version>
+            </palantirJavaFormat>
+            <removeUnusedImports/>
+          </java>
+        </configuration>
+      </plugin>
+
+      <!-- Unit tests (*Test). Version managed by the Boot parent. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!-- Mockito inline mock maker as an agent (JDK 21+ warns on dynamic agent loading). -->
+          <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
+        </configuration>
+      </plugin>
+
+      <!-- Integration tests (*IT) in `verify`. Executions (integration-test, verify) are
+           inherited from spring-boot-starter-parent; declare them yourself if you only import
+           the Boot BOM. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <configuration>
+          <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
+        </configuration>
+      </plugin>
+
+      <!-- Coverage report (target/site/jacoco). A minimum ratio is added only if the profile
+           sets one. prepare-agent defines @{argLine} used above. -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>prepare-agent-integration</id>
+            <goals>
+              <goal>prepare-agent-integration</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Dependency audit for /cuadrilla:security-audit: ./mvnw -B org.owasp:dependency-check-maven:check
+           Slow (downloads the NVD database on first run); not part of verify. An NVD API key,
+           if used, comes from an environment variable or CI secret, never from this file. -->
+      <plugin>
+        <groupId>org.owasp</groupId>
+        <artifactId>dependency-check-maven</artifactId>
+        <version>${dependency-check.version}</version>
+        <configuration>
+          <failBuildOnCVSS>7</failBuildOnCVSS>
+        </configuration>
+      </plugin>
+
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,138 @@
+# cuadrilla — python-fastapi standard: backend/pyproject.toml
+# Replace <app> with the package name from the project profile. Lower bounds are the versions the
+# standard was written against; uv.lock pins the exact versions (commit it).
+# Add or upgrade dependencies with `uv add` only after the user confirms.
+
+[project]
+name = "<app>"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.143",
+    "uvicorn[standard]>=0.54",
+    "pydantic>=2.14",
+    "pydantic-settings>=2.16",
+    "psycopg[binary]>=3.3",
+    "psycopg-pool>=3.3",
+    "pyjwt>=2.15",
+    "bcrypt>=5.0",
+    "python-multipart>=0.0.32", # only needed for UploadFile / Form endpoints
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17",
+    "mypy>=2.4",
+    "import-linter>=2.15",
+    "pytest>=9.1",
+    "pytest-asyncio>=1.4",
+    "httpx>=0.28",
+    "pip-audit>=2.10",
+]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "<app>"
+
+# ---------------------------------------------------------------------------------------------
+# ruff — lint + format. `uv run ruff check` and `uv run ruff format --check` in CI.
+# ---------------------------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F",   # pycodestyle + pyflakes
+    "I",             # import order
+    "N",             # pep8 naming
+    "UP",            # modern syntax
+    "B",             # bugbear
+    "A",             # shadowed builtins
+    "C4",            # comprehensions
+    "DTZ",           # naive datetimes
+    "T20",           # print()
+    "S",             # bandit (security)
+    "ASYNC",         # blocking calls inside async def (time.sleep, requests, open…)
+    "BLE",           # blind `except Exception`
+    "PT",            # pytest style
+    "RET",           # return consistency
+    "SIM",           # simplifications
+    "TID",           # banned APIs (below)
+    "FAST",          # FastAPI: Annotated dependencies, no redundant response_model
+    "RUF",
+]
+ignore = ["E501"] # the formatter owns line length
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"os.getenv".msg = "Read configuration through core.settings.Settings (pydantic-settings)."
+"os.environ".msg = "Read configuration through core.settings.Settings (pydantic-settings)."
+"fastapi.HTTPException".msg = "Raise a DomainError subclass; api/errors.py translates it."
+"sqlalchemy".msg = "No ORM / query builder: hand-written SQL with psycopg 3."
+"sqlmodel".msg = "No ORM / query builder: hand-written SQL with psycopg 3."
+"psycopg2".msg = "Use psycopg 3 (async) with psycopg_pool."
+"requests".msg = "Use httpx.AsyncClient (all I/O is async)."
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S105", "S106"] # assert and fake credentials are fine in tests
+
+# ---------------------------------------------------------------------------------------------
+# mypy — `uv run mypy` in CI (strict, with the pydantic plugin).
+# ---------------------------------------------------------------------------------------------
+[tool.mypy]
+strict = true
+python_version = "3.13"
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+
+# ---------------------------------------------------------------------------------------------
+# pytest — `uv run pytest` in CI.
+# ---------------------------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+
+# ---------------------------------------------------------------------------------------------
+# import-linter — `uv run lint-imports` in CI. Breaking a contract breaks the build.
+# ---------------------------------------------------------------------------------------------
+[tool.importlinter]
+root_package = "<app>"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Four layers: api -> (application | infrastructure) -> core"
+type = "layers"
+layers = [
+    "<app>.api",
+    "<app>.application | <app>.infrastructure",
+    "<app>.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Routers never touch infrastructure (wiring lives in api.dependencies)"
+type = "forbidden"
+source_modules = ["<app>.api.routers"]
+forbidden_modules = ["<app>.infrastructure"]
+allow_indirect_imports = true # routers reach infrastructure only through api.dependencies
+
+[[tool.importlinter.contracts]]
+name = "Application and core stay free of the web framework and the database driver"
+type = "forbidden"
+source_modules = ["<app>.application", "<app>.core"]
+forbidden_modules = ["fastapi", "starlette", "psycopg", "psycopg_pool"]

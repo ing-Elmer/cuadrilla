@@ -1,0 +1,130 @@
+{
+  "stack": "python-fastapi",
+  "agent": "cuadrilla-python-fastapi:backend-python",
+  "defaultPath": "backend",
+  "detect": ["pyproject.toml"],
+  "component": {
+    "setup": "uv sync --frozen",
+    "checks": [
+      { "name": "lint", "run": "uv run ruff check" },
+      { "name": "format", "run": "uv run ruff format --check" },
+      { "name": "types", "run": "uv run mypy" },
+      { "name": "layers", "run": "uv run lint-imports" },
+      { "name": "test", "run": "uv run pytest" }
+    ],
+    "format": [
+      { "glob": "**/*.py", "run": ["uv", "run", "--no-sync", "ruff", "format", "--quiet", "{file}"] },
+      { "glob": "**/*.py", "run": ["uv", "run", "--no-sync", "ruff", "check", "--fix", "--select", "I", "--quiet", "{file}"] }
+    ],
+    "lint": [
+      { "glob": "**/*.py", "run": ["uv", "run", "--no-sync", "ruff", "check", "--output-format", "concise", "{file}"] }
+    ],
+    "start": {
+      "run": "uv run uvicorn <app>.api.main:create_app --factory --reload --port 8000",
+      "port": 8000,
+      "health": "http://localhost:8000/health"
+    },
+    "audit": "uv run pip-audit"
+  },
+  "forbidden": [
+    {
+      "glob": "**/*.py",
+      "pattern": "^\\s*(?:from|import)\\s+(?:sqlalchemy|sqlmodel|tortoise|peewee|pony\\.orm|piccolo|ormar|django\\.db)\\b",
+      "message": "ORM / query builder import: the standard uses hand-written SQL with psycopg 3",
+      "tests": true
+    },
+    {
+      "glob": "**/*.py",
+      "pattern": "^\\s*(?:from|import)\\s+psycopg2\\b",
+      "message": "psycopg2 import: use psycopg 3 (async) with psycopg_pool",
+      "tests": true
+    },
+    {
+      "glob": "**/*.py",
+      "pattern": "\\.execute(?:many)?\\(\\s*[rbuRBU]?(?:\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')\\s*(?:%|\\+|\\.format\\()",
+      "message": "SQL built with %, + or .format(): pass parameters as %(name)s placeholders in a dict",
+      "tests": true
+    },
+    {
+      "glob": "**/{api/routers,application,core}/**/*.py",
+      "pattern": "\\bHTTPException\\b",
+      "message": "HTTPException in a router/service/core: raise a DomainError subclass with its status_code (api/errors.py translates it)",
+      "tests": false
+    },
+    {
+      "glob": "**/api/routers/**/*.py",
+      "pattern": "^\\s*try\\s*:",
+      "message": "try/except in a router: routers stay thin; exceptions are translated only in api/errors.py",
+      "tests": false
+    },
+    {
+      "glob": "**/api/routers/**/*.py",
+      "pattern": "\\bJSONResponse\\b",
+      "message": "JSONResponse in a router: return ApiResponse[...] (annotated return type)",
+      "tests": false
+    },
+    {
+      "glob": "**/api/routers/**/*.py",
+      "pattern": "^def\\s+\\w+\\s*\\(",
+      "message": "sync def in a router: endpoints are async def (all I/O is async)",
+      "tests": false
+    },
+    {
+      "glob": "**/{api,application,infrastructure,core/schemas}/**/*.py",
+      "pattern": "\\bos\\.(?:getenv\\s*\\(|environ\\b)",
+      "message": "os.getenv / os.environ outside core/settings.py: read configuration through Settings (pydantic-settings)",
+      "tests": false
+    },
+    {
+      "glob": "**/{api/routers,application}/**/*.py",
+      "pattern": "\\bjwt\\.decode\\(|headers\\s*(?:\\[|\\.get\\()\\s*[\"'][Aa]uthorization[\"']",
+      "message": "Token read outside api/security.py: use the get_current_user dependency (CurrentUserDep)",
+      "tests": false
+    },
+    {
+      "glob": "**/*.py",
+      "pattern": "allow_origins\\s*=\\s*\\[\\s*[\"']\\*[\"']\\s*\\]",
+      "message": "CORS allow_origins=[\"*\"]: list explicit origins from Settings",
+      "tests": false
+    },
+    {
+      "glob": "**/*.py",
+      "pattern": "\\bgensalt\\(\\s*(?:rounds\\s*=\\s*)?(?:[0-9]|1[01])\\s*[,)]",
+      "message": "bcrypt cost below 12: use Settings.bcrypt_rounds (>= 12)",
+      "tests": false
+    },
+    {
+      "glob": "**/*.py",
+      "pattern": "[\"']verify_(?:signature|exp)[\"']\\s*:\\s*False",
+      "message": "JWT verification disabled: always verify signature and expiry",
+      "tests": false
+    }
+  ],
+  "protectedPaths": [],
+  "recommendedSkills": [
+    {
+      "source": "fastapi/fastapi",
+      "skill": "fastapi",
+      "why": "Official FastAPI skill: current idioms for dependencies (Annotated[..., Depends(...)] aliases), lifespan, routers and testing.",
+      "conflicts": "Ignore SQLModel/SQLAlchemy (no ORM: hand-written SQL with psycopg 3), sync def by default (all I/O is async here), returning the model directly (always ApiResponse[...]) and ty (mypy --strict here)."
+    },
+    {
+      "source": "wshobson/agents",
+      "skill": "async-python-patterns",
+      "why": "asyncio patterns: gather/TaskGroup, timeouts, cancellation, avoiding blocking calls in async code.",
+      "conflicts": "Background work goes through the BackgroundTaskQueue started in the lifespan, not ad-hoc create_task calls in request handlers."
+    },
+    {
+      "source": "wshobson/agents",
+      "skill": "python-testing-patterns",
+      "why": "pytest fixtures, parametrization and async tests.",
+      "conflicts": "Ignore SQLAlchemy-based examples: services and validators are tested with fake repositories that implement the core Protocol (or AsyncMock); never against a shared database."
+    },
+    {
+      "source": "supabase/agent-skills",
+      "skill": "supabase-postgres-best-practices",
+      "why": "PostgreSQL indexing, query plans, locking and schema design guidance.",
+      "conflicts": "Ignore Supabase-specific parts (RLS policies, auth.uid(), Supabase client) unless the project profile declares Supabase."
+    }
+  ]
+}

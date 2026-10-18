@@ -1,0 +1,35 @@
+  # cuadrilla — React component job. Goes under `jobs:` in .github/workflows/ci.yml.
+  # Placeholders: <name> (component name in .claude/cuadrilla.json), <path> (component folder).
+  # Node version comes from <path>/.nvmrc (the same file local tooling uses), not from this file.
+  # Steps mirror component.setup + component.checks, in the same order. Keep them identical.
+  # Vercel/Netlify deploy natively from GitHub and wait for this check ("ci-<name>").
+  ci-<name>:
+    name: ci-<name>
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: <path>
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: <path>/.nvmrc
+          cache: npm
+          cache-dependency-path: <path>/package-lock.json
+
+      - name: Install dependencies (from package-lock.json)
+        run: npm ci
+
+      - name: Build (tsc -b + vite build)
+        run: npm run build
+
+      - name: Lint (ESLint + Prettier check)
+        run: npm run lint
+
+      - name: Test (Vitest)
+        run: npm run test -- --run

@@ -1,0 +1,16 @@
+{
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . && prettier --check .",
+    "lint:deps": "depcruise src --config .dependency-cruiser.cjs",
+    "format": "prettier --write .",
+    "test": "vitest",
+    "dev": "node --env-file-if-exists=.env --watch --import tsx src/main.ts",
+    "start": "node dist/main.js"
+  }
+}

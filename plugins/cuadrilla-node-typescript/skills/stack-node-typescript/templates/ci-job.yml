@@ -1,0 +1,46 @@
+  # cuadrilla node-typescript component. Placeholders: <name> (component name), <path> (component
+  # folder). The Node version is read from <path>/.nvmrc, so there is no version placeholder.
+  # Steps mirror component.json: setup, then every checks[].run in the same order.
+  ci-<name>:
+    name: ci-<name>
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: <path>
+    # Uncomment only if tests need a database (ephemeral, never a shared one).
+    # services:
+    #   postgres:
+    #     image: postgres:17
+    #     env:
+    #       POSTGRES_USER: app
+    #       POSTGRES_PASSWORD: app-ci-only
+    #       POSTGRES_DB: app_test
+    #     ports: ["5432:5432"]
+    #     options: >-
+    #       --health-cmd "pg_isready -U app" --health-interval 5s --health-timeout 5s --health-retries 10
+    # env:
+    #   APP_DB_MAIN_DSN: postgres://app:app-ci-only@localhost:5432/app_test
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: <path>/.nvmrc
+          cache: npm
+          cache-dependency-path: <path>/package-lock.json
+      - name: setup
+        run: npm ci
+      - name: typecheck
+        run: npm run typecheck
+      - name: lint
+        run: npm run lint
+      - name: deps
+        run: npm run lint:deps
+      - name: test
+        run: npm run test -- --run
+      - name: build
+        run: npm run build

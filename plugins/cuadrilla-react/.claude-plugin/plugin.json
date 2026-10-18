@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "cuadrilla-react",
+  "displayName": "Cuadrilla — React",
+  "version": "1.0.0",
+  "description": "Stack pack: React + TypeScript strict + Vite + Tailwind v4 + react-router + axios frontend standard, a frontend-react implementer agent, feature scaffolding, CI job and static-hosting templates. Works with any cuadrilla backend pack.",
+  "author": {
+    "name": "Elmer Mejías"
+  },
+  "license": "MIT",
+  "keywords": ["react", "typescript", "vite", "tailwind", "react-router", "vitest", "frontend", "spa"],
+  "dependencies": ["cuadrilla"]
+}

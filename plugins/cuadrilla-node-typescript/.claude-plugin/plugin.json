@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "cuadrilla-node-typescript",
+  "displayName": "Cuadrilla — Node.js + TypeScript backend",
+  "version": "1.0.0",
+  "description": "Stack pack for cuadrilla: Node.js LTS + TypeScript strict backend on Fastify, 4 layers enforced by dependency-cruiser, Zod at the edge, hand-written SQL with pg (or Kysely), jose JWT, pino, Vitest. Adds the backend-node agent, the stack standard, CI/Docker templates and a feature scaffolder.",
+  "author": {
+    "name": "Elmer Mejías"
+  },
+  "license": "MIT",
+  "keywords": ["node", "typescript", "fastify", "zod", "postgresql", "pg", "kysely", "vitest", "backend", "cuadrilla"],
+  "dependencies": ["cuadrilla"]
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "cuadrilla-java-spring",
+  "displayName": "Cuadrilla — Java + Spring Boot",
+  "version": "1.0.0",
+  "description": "Java + Spring Boot stack pack for cuadrilla: layered architecture enforced by ArchUnit, JdbcClient data access, ApiResponse envelope, deny-by-default Spring Security, Flyway migrations, a backend-java implementer agent and CI/Docker templates.",
+  "author": {
+    "name": "Elmer Mejías"
+  },
+  "license": "MIT",
+  "keywords": ["cuadrilla", "java", "spring-boot", "spring-security", "jdbc", "flyway", "archunit", "maven", "stack-pack"],
+  "dependencies": ["cuadrilla"]
+}

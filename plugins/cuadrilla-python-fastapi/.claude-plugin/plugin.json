@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "cuadrilla-python-fastapi",
+  "displayName": "Cuadrilla — Python + FastAPI",
+  "version": "1.0.0",
+  "description": "Stack pack for cuadrilla: Python + FastAPI + PostgreSQL with psycopg 3 (async, hand-written SQL), 4 layers enforced by import-linter, ApiResponse envelope, uv/ruff/mypy --strict/pytest, a backend-python implementer agent, CI job and Docker/Railway templates.",
+  "author": {
+    "name": "Elmer Mejías"
+  },
+  "license": "MIT",
+  "keywords": ["python", "fastapi", "postgresql", "psycopg", "pydantic", "uv", "ruff", "mypy", "pytest", "cuadrilla"],
+  "dependencies": ["cuadrilla"]
+}

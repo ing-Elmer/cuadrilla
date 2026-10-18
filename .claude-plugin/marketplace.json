@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "cuadrilla",
+  "description": "An engineering team of Claude Code agents with a written standard, guardrail hooks and automated code review. Language-agnostic core plus stack packs.",
+  "owner": {
+    "name": "Elmer Mejías"
+  },
+  "metadata": {
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "cuadrilla",
+      "source": "./plugins/cuadrilla",
+      "description": "Core: orchestrator, reviewers, security, QA, docs, guardrail hooks, GitHub code review. Works with any language.",
+      "category": "development",
+      "tags": ["agents", "code-review", "hooks", "security", "standard"]
+    },
+    {
+      "name": "cuadrilla-python-fastapi",
+      "source": "./plugins/cuadrilla-python-fastapi",
+      "description": "Stack pack: Python + FastAPI + PostgreSQL (psycopg 3, hand-written SQL, 4 layers, uv/ruff/mypy/pytest).",
+      "category": "development",
+      "tags": ["python", "fastapi", "postgresql"],
+      "dependencies": ["cuadrilla"]
+    },
+    {
+      "name": "cuadrilla-dotnet",
+      "source": "./plugins/cuadrilla-dotnet",
+      "description": "Stack pack: .NET + ASP.NET Core (4 layers, Dapper or EF Core, FluentValidation, xUnit).",
+      "category": "development",
+      "tags": ["dotnet", "csharp", "aspnetcore"],
+      "dependencies": ["cuadrilla"]
+    },
+    {
+      "name": "cuadrilla-node-typescript",
+      "source": "./plugins/cuadrilla-node-typescript",
+      "description": "Stack pack: Node.js + TypeScript backend (layered, Zod, Kysely/SQL, Vitest).",
+      "category": "development",
+      "tags": ["node", "typescript", "backend"],
+      "dependencies": ["cuadrilla"]
+    },
+    {
+      "name": "cuadrilla-java-spring",
+      "source": "./plugins/cuadrilla-java-spring",
+      "description": "Stack pack: Java + Spring Boot (layered, JdbcClient or JPA, Bean Validation, JUnit 5, Testcontainers).",
+      "category": "development",
+      "tags": ["java", "spring-boot"],
+      "dependencies": ["cuadrilla"]
+    },
+    {
+      "name": "cuadrilla-react",
+      "source": "./plugins/cuadrilla-react",
+      "description": "Stack pack: React + TypeScript + Vite + Tailwind v4 frontend, usable with any backend pack.",
+      "category": "development",
+      "tags": ["react", "typescript", "vite", "tailwind"],
+      "dependencies": ["cuadrilla"]
+    },
+    {
+      "name": "cuadrilla-codex",
+      "source": "./plugins/cuadrilla-codex",
+      "description": "Optional: OpenAI Codex CLI as a second executor and reviewer, always verified by Claude.",
+      "category": "development",
+      "tags": ["codex", "review"],
+      "dependencies": ["cuadrilla"],
+      "defaultEnabled": false
+    }
+  ]
+}

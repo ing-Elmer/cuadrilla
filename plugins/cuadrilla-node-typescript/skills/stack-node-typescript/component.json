@@ -1,0 +1,109 @@
+{
+  "stack": "node-typescript",
+  "agent": "cuadrilla-node-typescript:backend-node",
+  "defaultPath": "backend",
+  "detect": ["package.json", "tsconfig.json"],
+  "component": {
+    "setup": "npm ci",
+    "checks": [
+      { "name": "typecheck", "run": "npm run typecheck" },
+      { "name": "lint", "run": "npm run lint" },
+      { "name": "deps", "run": "npm run lint:deps" },
+      { "name": "test", "run": "npm run test -- --run" },
+      { "name": "build", "run": "npm run build" }
+    ],
+    "format": [
+      { "glob": "**/*.{ts,mts,js,mjs,json}", "run": ["node", "node_modules/prettier/bin/prettier.cjs", "--write", "--log-level", "warn", "{file}"] }
+    ],
+    "lint": [
+      {
+        "glob": "**/*.{ts,mts}",
+        "run": ["node", "node_modules/eslint_d/bin/eslint_d.js", "--no-warn-ignored", "{file}"],
+        "fallback": ["node", "node_modules/eslint/bin/eslint.js", "--no-warn-ignored", "{file}"]
+      }
+    ],
+    "start": {
+      "run": "npm run dev",
+      "port": 3000,
+      "health": "http://localhost:3000/health"
+    },
+    "audit": "npm audit --omit=dev"
+  },
+  "forbidden": [
+    {
+      "glob": "**/*.{ts,mts,js,mjs}",
+      "pattern": "(?:from\\s+|import\\s+|require\\(\\s*)['\"](?:@prisma/client|prisma|typeorm|sequelize(?:-typescript)?|@mikro-orm/[\\w-]+|drizzle-orm(?:/[\\w-]+)*)['\"]",
+      "message": "ORM import (Prisma/TypeORM/Sequelize/MikroORM/Drizzle) — the standard uses hand-written SQL with pg or the Kysely query builder unless the project profile declares an ORM",
+      "tests": true
+    },
+    {
+      "glob": "**/package.json",
+      "pattern": "\"(?:@prisma/client|prisma|typeorm|sequelize|@mikro-orm/core|drizzle-orm)\"\\s*:",
+      "message": "ORM dependency added to package.json — not allowed unless the project profile declares it (and new dependencies need the user's confirmation)",
+      "tests": true
+    },
+    {
+      "glob": "src/{api,application,core,infrastructure}/**/*.{ts,mts}",
+      "pattern": "\\bprocess\\.env\\b",
+      "message": "process.env read inside a layer — env is parsed once by parseConfig() (src/core/config.ts) called from src/main.ts; inject the typed AppConfig instead",
+      "tests": false
+    },
+    {
+      "glob": "src/{application,core}/**/*.{ts,mts}",
+      "pattern": "\\bthrow\\s+new\\s+Error\\(",
+      "message": "throw new Error() in application/core — throw a domain error from src/core/errors.ts (it carries its statusCode) so the error handler maps it",
+      "tests": false
+    },
+    {
+      "glob": "src/api/**/*.{ts,mts}",
+      "pattern": "\\breply\\s*(?:\\.(?:code|status)\\(\\s*\\d+\\s*\\))?\\s*\\.send\\(\\s*\\{",
+      "message": "raw object sent with reply.send({...}) — return ApiResponse.ok/created/page(...) from src/api/response.ts (the standard envelope)",
+      "tests": false
+    },
+    {
+      "glob": "src/{api,application,core}/**/*.{ts,mts}",
+      "pattern": "\\bnew\\s+(?:pg\\.)?Pool\\s*\\(",
+      "message": "database pool created outside src/infrastructure — pools are created once by infrastructure/db.ts and wired in api/container.ts",
+      "tests": false
+    },
+    {
+      "glob": "src/{api/routes,application}/**/*.{ts,mts}",
+      "pattern": "headers\\s*(?:\\.\\s*authorization\\b|\\[\\s*['\"]authorization['\"]\\s*\\])",
+      "message": "Authorization header read in a route/service — the current user comes only from getCurrentUser(request) (src/api/auth)",
+      "tests": false
+    },
+    {
+      "glob": "**/*.{ts,mts,js,mjs}",
+      "pattern": "\\.query\\(\\s*(?:'[^']*'|\"[^\"]*\"|\\w+)\\s*\\+",
+      "message": "SQL built by string concatenation in .query() — use $1..$n parameters (pg) or Kysely bindings",
+      "tests": true
+    },
+    {
+      "glob": "**/*.{ts,mts,js,mjs}",
+      "pattern": "\\bsql\\.(?:raw|lit)\\s*\\(",
+      "message": "Kysely sql.raw()/sql.lit() bypass parameter binding — interpolate values in the sql`` tag (bound) and use sql.ref()/sql.id() with a whitelist for identifiers",
+      "tests": true
+    }
+  ],
+  "protectedPaths": [],
+  "recommendedSkills": [
+    {
+      "source": "mcollina/skills",
+      "skill": "fastify-best-practices",
+      "why": "Written by Fastify's lead maintainer: plugin encapsulation, hooks lifecycle, decorators, serialization and Pino details that complement this standard.",
+      "conflicts": "Ignore JSON Schema/TypeBox as the validation layer (this standard uses Zod via fastify-type-provider-zod) and running TypeScript directly with Node type stripping (this standard builds with tsc and runs dist/ in production; tsx only for dev)."
+    },
+    {
+      "source": "wshobson/agents",
+      "skill": "typescript-advanced-types",
+      "why": "Generics, conditional and mapped types for typed repositories, envelopes and DTO helpers without escaping to any.",
+      "conflicts": "None material; never use its techniques to bypass strict mode (no any, no as unknown as, no non-null assertions to silence noUncheckedIndexedAccess)."
+    },
+    {
+      "source": "wshobson/agents",
+      "skill": "nodejs-backend-patterns",
+      "why": "General Node.js backend patterns (graceful shutdown, middleware ordering, caching, rate limiting) as background reading.",
+      "conflicts": "Ignore its Express-first examples, Winston logging, ad-hoc response shapes and folder layout: this standard mandates Fastify, pino, the ApiResponse envelope and the 4-layer src/ layout. Ignore any ORM usage."
+    }
+  ]
+}

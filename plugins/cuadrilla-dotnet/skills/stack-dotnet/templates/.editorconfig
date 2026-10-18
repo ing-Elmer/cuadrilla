@@ -1,0 +1,84 @@
+# cuadrilla .NET standard — minimal editorconfig. Severity "warning" fails the build
+# (TreatWarningsAsErrors + EnforceCodeStyleInBuild); `dotnet format` applies the fixes.
+root = true
+
+[*]
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,xml,csproj,props,targets,slnx}]
+indent_size = 2
+
+[*.cs]
+# Layout
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_sort_system_directives_first = true
+csharp_prefer_braces = when_multiline:warning
+csharp_new_line_before_open_brace = all
+
+# Language
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+dotnet_style_readonly_field = true:warning
+csharp_style_prefer_primary_constructors = true:suggestion
+
+# Naming: constants and static readonly PascalCase, private fields _camelCase, interfaces I*, async *Async
+dotnet_naming_rule.constants_pascal.symbols = constants
+dotnet_naming_rule.constants_pascal.style = pascal
+dotnet_naming_rule.constants_pascal.severity = warning
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.required_modifiers = const
+
+dotnet_naming_rule.static_readonly_pascal.symbols = static_readonly_fields
+dotnet_naming_rule.static_readonly_pascal.style = pascal
+dotnet_naming_rule.static_readonly_pascal.severity = warning
+dotnet_naming_symbols.static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_fields.required_modifiers = static, readonly
+dotnet_naming_style.pascal.capitalization = pascal_case
+
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+dotnet_naming_style.underscore_camel.required_prefix = _
+
+dotnet_naming_rule.interfaces_i.symbols = interfaces
+dotnet_naming_rule.interfaces_i.style = prefix_i
+dotnet_naming_rule.interfaces_i.severity = warning
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.prefix_i.capitalization = pascal_case
+dotnet_naming_style.prefix_i.required_prefix = I
+
+dotnet_naming_rule.async_methods.symbols = async_methods
+dotnet_naming_rule.async_methods.style = async_suffix
+dotnet_naming_rule.async_methods.severity = suggestion
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.required_modifiers = async
+dotnet_naming_style.async_suffix.capitalization = pascal_case
+dotnet_naming_style.async_suffix.required_suffix = Async
+
+# Naming rules above only fail the build when IDE1006 has an explicit severity
+# (verified with SDK 10.0.400: without this line a private field without "_" builds fine).
+dotnet_diagnostic.IDE1006.severity = warning
+
+# Analyzers that back the standard
+# forward the CancellationToken
+dotnet_diagnostic.CA2016.severity = warning
+# logging message template must be constant
+dotnet_diagnostic.CA2254.severity = warning
+# CancellationToken is the last parameter
+dotnet_diagnostic.CA1068.severity = warning
+# no ConfigureAwait in ASP.NET Core apps
+dotnet_diagnostic.CA2007.severity = none
+# LoggerMessage delegates for hot paths
+dotnet_diagnostic.CA1848.severity = suggestion
+# unnecessary usings (warning requires GenerateDocumentationFile)
+dotnet_diagnostic.IDE0005.severity = suggestion
+
+[tests/**.cs]
+# Test method names use underscores (Method_Scenario_Expected)
+dotnet_diagnostic.CA1707.severity = none

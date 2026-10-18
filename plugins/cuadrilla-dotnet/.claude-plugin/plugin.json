@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "cuadrilla-dotnet",
+  "displayName": "Cuadrilla .NET",
+  "version": "1.0.0",
+  "description": "Stack pack for cuadrilla: .NET + ASP.NET Core in 4 layers (Api/Application/Core/Infrastructure), Dapper by default or EF Core, SQL Server/PostgreSQL/Oracle, FluentValidation, xUnit, architecture tests, CI and Docker templates.",
+  "author": {
+    "name": "Elmer Mejías"
+  },
+  "license": "MIT",
+  "keywords": ["dotnet", "csharp", "aspnetcore", "dapper", "efcore", "xunit", "clean-architecture", "cuadrilla"],
+  "dependencies": ["cuadrilla"]
+}

@@ -1,0 +1,85 @@
+{
+  "stack": "dotnet",
+  "agent": "cuadrilla-dotnet:backend-dotnet",
+  "defaultPath": "backend",
+  "detect": ["*.slnx", "*.sln", "global.json", "Directory.Build.props"],
+  "component": {
+    "setup": "dotnet restore --locked-mode",
+    "checks": [
+      { "name": "build", "run": "dotnet build --no-restore -warnaserror" },
+      { "name": "format", "run": "dotnet format --verify-no-changes --no-restore" },
+      { "name": "test", "run": "dotnet test --no-build" }
+    ],
+    "start": {
+      "run": "dotnet run --project src/<App>.Api --urls http://localhost:5000",
+      "port": 5000,
+      "health": "http://localhost:5000/health"
+    },
+    "audit": "dotnet list package --vulnerable --include-transitive"
+  },
+  "forbidden": [
+    {
+      "glob": "**/*.cs",
+      "pattern": "\\b(?:Query|Execute|QueryFirst\\w*|QuerySingle\\w*|QueryMultiple)\\w*(?:<[^>]*>)?\\(\\s*@?\"[^\"]*\"\\s*\\+|\\bnew\\s+CommandDefinition\\(\\s*(?:@?\"[^\"]*\"\\s*\\+|\\$@?\")",
+      "message": "SQL built by concatenation/interpolation in a Dapper call — use a const SQL string with parameters",
+      "tests": true
+    },
+    {
+      "glob": "**/*.{Api,Application,Core}/**/*.cs",
+      "pattern": "\\bnew\\s+(?:SqlConnection|NpgsqlConnection|NpgsqlDataSourceBuilder|OracleConnection|SqliteConnection|MySqlConnection)\\s*\\(",
+      "message": "Database connection created outside <App>.Infrastructure — use IDbConnectionFactory in a repository",
+      "tests": true
+    },
+    {
+      "glob": "**/{Controllers,Endpoints}/**/*.cs",
+      "pattern": "^\\s*(?:\\}\\s*)?(?:try\\b|catch\\b)",
+      "message": "try/catch in a controller/endpoint — let the central IExceptionHandler translate exceptions",
+      "tests": false
+    },
+    {
+      "glob": "**/*.cs",
+      "pattern": "(?:\\[\\s*AllowAnonymous\\s*\\]|\\.AllowAnonymous\\(\\s*\\))(?!.*//)",
+      "message": "[AllowAnonymous] / .AllowAnonymous() must be justified with a comment on the same line (// why it is public)",
+      "tests": false
+    },
+    {
+      "glob": "**/*.cs",
+      "pattern": "\\bDateTime(?:Offset)?\\.(?:Now|Today)\\b",
+      "message": "DateTime.Now/Today — inject TimeProvider (FakeTimeProvider in tests) and work in UTC",
+      "tests": true
+    },
+    {
+      "glob": "**/*.cs",
+      "pattern": "^\\s*#pragma\\s+warning\\s+disable\\b(?!.*//)",
+      "message": "#pragma warning disable without a justification comment on the same line",
+      "tests": true
+    },
+    {
+      "glob": "**/*.cs",
+      "pattern": "\\[\\s*(?:assembly:\\s*)?SuppressMessage\\((?!.*Justification\\s*=)",
+      "message": "[SuppressMessage] without Justification = \"...\"",
+      "tests": true
+    }
+  ],
+  "protectedPaths": ["appsettings.Production.json", "appsettings.*.local.json", "secrets.json"],
+  "recommendedSkills": [
+    {
+      "source": "dotnet/skills",
+      "skill": "dotnet-webapi",
+      "why": "Official .NET team guidance for ASP.NET Core endpoints: HTTP semantics, OpenAPI metadata, .http files.",
+      "conflicts": "Ignore its default of minimal APIs for new projects, its raw ProblemDetails/TypedResults bodies and its Create{Entity}Request naming: cuadrilla uses controllers (unless the profile says otherwise), the ApiResponse<T> envelope and <Feature>Request/<Feature>Response."
+    },
+    {
+      "source": "dotnet/skills",
+      "skill": "test-anti-patterns",
+      "why": "Official .NET team checklist for flaky, over-mocked or assertion-free tests; useful when reviewing test changes.",
+      "conflicts": "None known; cuadrilla's mandatory test list (auth, 400/401/403, regression per bug) still applies."
+    },
+    {
+      "source": "dotnet/skills",
+      "skill": "csharp-refactoring",
+      "why": "Official .NET team procedure for behavior-preserving refactors (renames, moves, extractions) verified by build + tests.",
+      "conflicts": "Keep the 4-project dependency rule and the architecture test; a refactor never moves SQL out of Infrastructure or logic into controllers."
+    }
+  ]
+}

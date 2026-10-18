@@ -1,0 +1,33 @@
+  # cuadrilla java-spring component job. Placeholders: <name>, <path>, <java-version> (the
+  # <java.version> pinned in pom.xml). Steps mirror component.json: setup, then checks in order.
+  ci-<name>:
+    name: ci-<name>
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: <path>
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "<java-version>"
+          cache: maven
+          cache-dependency-path: <path>/pom.xml
+
+      # mvnw must be committed with the executable bit (git update-index --chmod=+x mvnw)
+      - name: setup
+        run: ./mvnw -B -q dependency:go-offline
+
+      - name: format
+        run: ./mvnw -B spotless:check
+
+      # compile, unit tests, ArchitectureTest, Failsafe *IT (Testcontainers uses the runner's Docker)
+      - name: verify
+        run: ./mvnw -B verify

@@ -1,0 +1,32 @@
+<Project>
+  <!-- Shared by every project under this folder (cuadrilla .NET standard). -->
+  <PropertyGroup>
+    <!-- Keep in sync with the SDK pinned in global.json. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Warnings are errors, locally and in CI (dotnet build -warnaserror). -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Style rules set to warning in .editorconfig also fail the build. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
+
+    <!-- Deterministic restores: commit every packages.lock.json; CI runs restore locked-mode. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- NuGet audit (NU1901-NU1904) covers transitive packages; with TreatWarningsAsErrors a known
+         vulnerability fails the build. To unblock a release temporarily, add the code to
+         WarningsNotAsErrors with a comment and a tracking issue - never NoWarn. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!-- Test projects (named *Tests) are never packed. -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>

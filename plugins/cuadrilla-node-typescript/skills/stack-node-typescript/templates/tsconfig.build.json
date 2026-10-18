@@ -1,0 +1,11 @@
+{
+  // Production build: src/ only, emitted to dist/ (npm run build).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "coverage", "test", "src/**/*.test.ts"]
+}

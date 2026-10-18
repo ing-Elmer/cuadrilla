@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "cuadrilla-codex",
+  "displayName": "Cuadrilla · Codex",
+  "version": "1.0.0",
+  "description": "Optional: use OpenAI Codex CLI as a second executor and as a second-opinion reviewer. Claude always verifies Codex's work against the cuadrilla standard.",
+  "author": {
+    "name": "Elmer Mejías"
+  },
+  "license": "MIT",
+  "keywords": ["codex", "review", "second-opinion"],
+  "dependencies": ["cuadrilla"]
+}

@@ -1,0 +1,17 @@
+# cuadrilla — OPTIONAL deploy template for Railway (copy only if the project profile deploys there).
+# Config-as-code for the backend service. In a monorepo Railway does NOT look for this file inside
+# the Root Directory: set Settings > Config-as-code > "/<path>/railway.toml" on the service and
+# Root Directory "/<path>". Turn on "Wait for CI" so Railway deploys only after ci-<name> passes.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+# Redeploy only when the backend changed.
+watchPatterns = ["/<path>/**"]
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+# No preDeployCommand: SQL migrations are run by a person, never by the deploy.

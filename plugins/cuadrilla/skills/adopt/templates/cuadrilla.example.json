@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "baseBranch": "main",
+  "components": [
+    {
+      "name": "api",
+      "path": "backend",
+      "stack": "generic",
+      "agent": "cuadrilla:developer",
+      "setup": "",
+      "checks": [],
+      "format": [],
+      "lint": [],
+      "start": { "run": "", "port": 8000, "health": "http://localhost:8000/health" },
+      "audit": ""
+    }
+  ],
+  "forbidden": [],
+  "protectedPaths": [],
+  "stopCheck": true,
+  "builtinPatterns": true
+}

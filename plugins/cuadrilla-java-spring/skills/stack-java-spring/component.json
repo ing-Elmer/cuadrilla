@@ -1,0 +1,150 @@
+{
+  "stack": "java-spring",
+  "agent": "cuadrilla-java-spring:backend-java",
+  "defaultPath": "backend",
+  "detect": ["pom.xml", "build.gradle", "build.gradle.kts"],
+  "component": {
+    "setup": "./mvnw -B -q dependency:go-offline",
+    "checks": [
+      { "name": "format", "run": "./mvnw -B spotless:check" },
+      { "name": "verify", "run": "./mvnw -B verify" }
+    ],
+    "start": {
+      "run": "./mvnw spring-boot:run",
+      "port": 8080,
+      "health": "http://localhost:8080/actuator/health"
+    },
+    "audit": "./mvnw -B org.owasp:dependency-check-maven:check"
+  },
+  "forbidden": [
+    {
+      "glob": "**/*.java",
+      "pattern": "@Autowired\\b",
+      "message": "@Autowired injection: use constructor injection with final fields (a single constructor needs no annotation)",
+      "tests": false
+    },
+    {
+      "glob": "**/{application,domain,infrastructure}/**/*.java",
+      "pattern": "\\bSecurityContextHolder\\b",
+      "message": "SecurityContextHolder outside <base>.api.security: inject the CurrentUser port instead",
+      "tests": true
+    },
+    {
+      "glob": "**/{api,domain,infrastructure}/**/*.java",
+      "pattern": "@Transactional\\b",
+      "message": "@Transactional belongs only on public methods of <base>.application services",
+      "tests": false
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "\\bnew\\s+RestTemplate\\s*\\(",
+      "message": "new RestTemplate(): build a RestClient from the injected RestClient.Builder in <base>.infrastructure",
+      "tests": true
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "\\b(?:(?:LocalDateTime|LocalDate|LocalTime|Instant|OffsetDateTime|ZonedDateTime)\\.now|new\\s+Date)\\(\\s*\\)",
+      "message": "Reading the system clock directly: inject java.time.Clock and call X.now(clock)",
+      "tests": false
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "catch\\s*\\([^)]*\\)\\s*\\{\\s*\\}",
+      "message": "Empty catch block: handle, rethrow as a domain exception, or log with the exception",
+      "tests": true
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "@CrossOrigin\\b",
+      "message": "@CrossOrigin: CORS is configured once in the security config from validated properties",
+      "tests": true
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "anyRequest\\(\\)\\s*\\.permitAll\\(\\)",
+      "message": "anyRequest().permitAll(): security is deny-by-default (anyRequest().authenticated())",
+      "tests": true
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "(?:allowedOrigins|allowedOriginPatterns|addAllowedOrigin|addAllowedOriginPattern|setAllowedOrigins|setAllowedOriginPatterns)\\(\\s*(?:(?:List|Set)\\.of\\(\\s*)?\"\\*\"",
+      "message": "Wildcard CORS origin: list explicit origins from configuration",
+      "tests": true
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "\\bNoOpPasswordEncoder\\b",
+      "message": "NoOpPasswordEncoder: hash passwords with BCrypt (strength >= 12) or Argon2",
+      "tests": true
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "@Value\\(\\s*\"\\$\\{",
+      "message": "@Value(\"${...}\"): bind configuration to a @Validated @ConfigurationProperties record",
+      "tests": false
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "\\b(?:sql|query|update|queryForObject|queryForList|queryForMap|execute|batchUpdate)\\(\\s*(?:String\\.format\\(|\"[^\"]*\"\\s*\\.formatted\\()",
+      "message": "SQL built with String.format/formatted: use named parameters (:name) and .param(...)",
+      "tests": true
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "^\\s*import\\s+(?:static\\s+)?(?:jakarta\\.persistence\\.|org\\.springframework\\.data\\.jpa\\.|org\\.hibernate\\.(?!validator\\.))",
+      "message": "JPA/Hibernate is not allowed unless the project profile declares it (then remove this rule from .claude/cuadrilla.json)",
+      "tests": true
+    },
+    {
+      "glob": "**/*.java",
+      "pattern": "FetchType\\.EAGER\\b",
+      "message": "FetchType.EAGER: map associations LAZY and load them with an explicit fetch plan",
+      "tests": true
+    },
+    {
+      "glob": "**/application*.{yml,yaml,properties}",
+      "pattern": "ddl-auto\\s*[:=]\\s*[\"']?(?:update|create|create-drop)\\b",
+      "message": "Hibernate ddl-auto update/create: the schema changes only through Flyway migrations (use none or validate)",
+      "tests": true
+    },
+    {
+      "glob": "**/application*.{yml,yaml,properties}",
+      "pattern": "open-in-view\\s*[:=]\\s*[\"']?true\\b",
+      "message": "spring.jpa.open-in-view=true: keep it false and load what the response needs in the service",
+      "tests": true
+    },
+    {
+      "glob": "**/application*.{yml,yaml,properties}",
+      "pattern": "include-(?:stacktrace|exception|message|binding-errors)\\s*[:=]\\s*[\"']?(?:always|on[-_]param|true)\\b",
+      "message": "server.error.include-*: never expose stack traces or exception details to clients",
+      "tests": true
+    },
+    {
+      "glob": "**/application*.{yml,yaml,properties}",
+      "pattern": "(?:exposure\\.)?include\\s*[:=]\\s*[\"']?\\*[\"']?\\s*$",
+      "message": "Actuator exposure '*': expose only health (and info) over HTTP",
+      "tests": true
+    }
+  ],
+  "protectedPaths": [],
+  "recommendedSkills": [
+    {
+      "source": "github/awesome-copilot",
+      "skill": "java-springboot",
+      "why": "Broad Spring Boot practices from GitHub's curated collection: constructor injection, typed configuration, DTOs, SLF4J, test slices.",
+      "conflicts": "Ignore package-by-feature (cuadrilla uses package-by-layer: api/application/domain/infrastructure), Spring Data JPA as the default data layer (cuadrilla defaults to JdbcClient; JPA only if the profile declares it), @Transactional 'at the most granular level' anywhere (cuadrilla: application services only) and Spring profiles files carrying environment config with values (cuadrilla: env vars, no secrets in application-*.yml)."
+    },
+    {
+      "source": "github/awesome-copilot",
+      "skill": "java-junit",
+      "why": "JUnit 5 structure, parameterized tests, @Nested grouping and Mockito basics.",
+      "conflicts": "Use AssertJ (assertThat) rather than JUnit Assertions, prefer hand-written fakes for repositories over @Mock/@InjectMocks, never @TestMethodOrder for ordering-dependent tests, and @Disabled is not a way to get the build green."
+    },
+    {
+      "source": "affaan-m/everything-claude-code",
+      "skill": "springboot-security",
+      "why": "Checklist-style Spring Security review: method security, validation, headers, rate limiting, dependency scanning.",
+      "conflicts": "Ignore the hand-written OncePerRequestFilter that puts tokens into SecurityContextHolder (cuadrilla uses the oauth2 resource server JwtDecoder), hasRole('ADMIN') checks (cuadrilla: hasAuthority('<PERMISSION_CODE>')) and controllers returning DTOs or ResponseEntity without the ApiResponse envelope."
+    }
+  ]
+}

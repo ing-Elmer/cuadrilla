@@ -1,0 +1,115 @@
+{
+  "stack": "react",
+  "agent": "cuadrilla-react:frontend-react",
+  "defaultPath": "frontend",
+  "detect": ["vite.config.ts", "vite.config.mts", "vite.config.js", "vite.config.mjs"],
+  "component": {
+    "setup": "npm ci",
+    "checks": [
+      { "name": "build", "run": "npm run build" },
+      { "name": "lint", "run": "npm run lint" },
+      { "name": "test", "run": "npm run test -- --run" }
+    ],
+    "format": [
+      { "glob": "**/*.{ts,tsx,js,jsx,css,json}", "run": ["node", "node_modules/prettier/bin/prettier.cjs", "--write", "--log-level", "warn", "{file}"] }
+    ],
+    "lint": [
+      {
+        "glob": "**/*.{ts,tsx}",
+        "run": ["node", "node_modules/eslint_d/bin/eslint_d.js", "--no-warn-ignored", "{file}"],
+        "fallback": ["node", "node_modules/eslint/bin/eslint.js", "--no-warn-ignored", "{file}"]
+      }
+    ],
+    "start": { "run": "npm run dev", "port": 5173, "health": "http://localhost:5173/" },
+    "audit": "npm audit --omit=dev"
+  },
+  "forbidden": [
+    {
+      "glob": "**/src/**/*.{ts,tsx}",
+      "pattern": "\\bfrom\\s+[\"']axios[\"']|\\b(?:import|require)\\(\\s*[\"']axios[\"']\\s*\\)|^\\s*import\\s+[\"']axios[\"']",
+      "message": "axios imported directly: only src/api/api.ts may import axios (that file is the one expected exception). Everything else calls a service built on request<T>() from src/services/ApiClient.ts",
+      "tests": false
+    },
+    {
+      "glob": "**/src/**/*.{ts,tsx}",
+      "pattern": "\\bfrom\\s+[\"']\\.\\./|\\b(?:import|require|vi\\.mock|vi\\.doMock)\\(\\s*[\"']\\.\\./|^\\s*import\\s+[\"']\\.\\./",
+      "message": "relative ../ import: use the @/ alias (e.g. @/services/CustomerService)",
+      "tests": true
+    },
+    {
+      "glob": "**/src/**/*.{ts,tsx}",
+      "pattern": "(?<![\\w.$])fetch\\(|\\b(?:window|globalThis|self)\\.fetch\\(",
+      "message": "direct fetch(): call the API through a service and request<T>() so auth, refresh and the envelope are handled in one place",
+      "tests": false
+    },
+    {
+      "glob": "**/src/**/*.{ts,tsx}",
+      "pattern": "[\"'`]https?://(?!www\\.w3\\.org/)",
+      "message": "hardcoded URL: the API base URL comes from import.meta.env.VITE_API_URL and paths live in src/api/endpoints.ts. If this is a deliberate external link (docs, support page), say so in your summary",
+      "tests": false
+    },
+    {
+      "glob": "**/src/**/*.{ts,tsx,jsx}",
+      "pattern": "dangerouslySetInnerHTML(?!\\s*=\\s*\\{\\{\\s*__html:\\s*[A-Z][A-Z0-9_]*\\s*\\}\\})",
+      "message": "dangerouslySetInnerHTML with non-constant data (XSS): render text instead; only an UPPER_SNAKE compile-time constant is accepted",
+      "tests": true
+    },
+    {
+      "glob": "**/src/**/*.{ts,tsx}",
+      "pattern": "\\blocalStorage\\.setItem\\([^)]*(?:[Tt]oken|TOKEN|[Jj][Ww][Tt])",
+      "message": "token written to localStorage (readable by any XSS): the access token lives in memory (src/api/tokenStore.ts) and the refresh token in an httpOnly cookie. An exception must be declared in the project profile",
+      "tests": false
+    },
+    {
+      "glob": "**/{.env*,*.ts,*.tsx}",
+      "pattern": "\\bVITE_[A-Z0-9_]*(?:SECRET|PASSWORD|PRIVATE|API_KEY|TOKEN)",
+      "message": "secret-looking VITE_* variable: every VITE_* value is embedded in the public bundle. Secrets stay in the backend",
+      "tests": true
+    },
+    {
+      "glob": "**/src/**/*.{ts,tsx}",
+      "pattern": "@ts-expect-error|eslint-disable(?:-next-line|-line)?\\s+react-hooks/",
+      "message": "@ts-expect-error or disabled react-hooks rule: fix the type or the dependency list instead of silencing it",
+      "tests": false
+    },
+    {
+      "glob": "**/src/**/*.{ts,tsx}",
+      "pattern": "\\bwindow\\.(?:alert|confirm|prompt)\\(",
+      "message": "native browser dialog: use the shared ConfirmDialog / toast components from src/components/ui/",
+      "tests": false
+    }
+  ],
+  "protectedPaths": [],
+  "recommendedSkills": [
+    {
+      "source": "vercel-labs/agent-skills",
+      "skill": "vercel-react-best-practices",
+      "why": "React performance and rendering patterns (waterfalls, re-renders, bundle size) from Vercel Engineering.",
+      "conflicts": "Next.js-specific advice (Server Components, server actions, next/* APIs, SWR) does not apply to a Vite SPA; data fetching stays in services + useAsyncResource. No SWR/React Query without asking."
+    },
+    {
+      "source": "anthropics/skills",
+      "skill": "frontend-design",
+      "why": "Visual direction for new screens: typography, layout and avoiding templated-looking UI.",
+      "conflicts": "Colors, radii and fonts must still become @theme tokens in the global CSS; no new UI or styling libraries without asking."
+    },
+    {
+      "source": "vercel-labs/agent-skills",
+      "skill": "web-design-guidelines",
+      "why": "Checklist-style review of UI code for accessibility and UX issues.",
+      "conflicts": "Findings are advisory; the stack-react accessibility rules are the minimum bar."
+    },
+    {
+      "source": "wshobson/agents",
+      "skill": "tailwind-design-system",
+      "why": "Tailwind v4 design tokens, component variants and responsive patterns.",
+      "conflicts": "Some examples use react-hook-form, zod, shadcn/ui or cva: adding any of them needs explicit confirmation. Keep CSS-first config (no tailwind.config.js)."
+    },
+    {
+      "source": "anthropics/skills",
+      "skill": "webapp-testing",
+      "why": "Playwright recipes the core qa agent can use to drive the running app end to end.",
+      "conflicts": "Screenshots and logs go to the session scratchpad, never into the repo; unit tests stay in Vitest + Testing Library."
+    }
+  ]
+}
