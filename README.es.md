@@ -48,7 +48,7 @@ Los comandos, hooks y servidores MCP están detallados en el [README en inglés]
 Requisitos: Claude Code, Node.js ≥ 18 (hooks) y git. Opcionales: `gh`, Docker.
 
 ```text
-/plugin marketplace add <tu-usuario>/cuadrilla         # el repo de GitHub
+/plugin marketplace add ing-Elmer/cuadrilla         # el repo de GitHub
 /plugin install cuadrilla@cuadrilla                      # elegí el idioma de respuesta
 /plugin install cuadrilla-python-fastapi@cuadrilla       # los packs de tus stacks
 /plugin install cuadrilla-react@cuadrilla

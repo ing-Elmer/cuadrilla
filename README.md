@@ -94,7 +94,7 @@ It works with **any language**. Stack packs add deep, opinionated rules for Pyth
 Requirements: Claude Code, Node.js ≥ 18 (hooks), git. Optional: `gh`, Docker.
 
 ```text
-/plugin marketplace add <your-user>/cuadrilla         # the GitHub repo
+/plugin marketplace add ing-Elmer/cuadrilla         # the GitHub repo
 /plugin install cuadrilla@cuadrilla                      # choose the response language
 /plugin install cuadrilla-python-fastapi@cuadrilla       # the packs for your stacks
 /plugin install cuadrilla-react@cuadrilla
