@@ -43,12 +43,14 @@ Python/FastAPI, .NET, Node/TypeScript, Java/Spring y React.
 
 Los comandos, hooks y servidores MCP están detallados en el [README en inglés](README.md#commands).
 
+**Nota sobre MCP:** `github` (necesita `GITHUB_PAT`) y `atlassian` (OAuth con `/mcp`) son opcionales. Si no los configuras, `/mcp` mostrará `github` como fallido ("Authorization header is badly formatted"); es esperado y no afecta nada más: Cuadrilla usa el CLI `gh`. En Windows: `setx GITHUB_PAT "<token>"` y reinicia Claude Code.
+
 ## Instalación
 
 Requisitos: Claude Code, Node.js ≥ 18 (hooks) y git. Opcionales: `gh`, Docker.
 
 ```text
-/plugin marketplace add ing-Elmer/cuadrilla         # el repo de GitHub
+/plugin marketplace add <tu-usuario>/cuadrilla         # el repo de GitHub
 /plugin install cuadrilla@cuadrilla                      # elegí el idioma de respuesta
 /plugin install cuadrilla-python-fastapi@cuadrilla       # los packs de tus stacks
 /plugin install cuadrilla-react@cuadrilla

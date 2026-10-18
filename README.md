@@ -94,7 +94,7 @@ It works with **any language**. Stack packs add deep, opinionated rules for Pyth
 Requirements: Claude Code, Node.js ≥ 18 (hooks), git. Optional: `gh`, Docker.
 
 ```text
-/plugin marketplace add ing-Elmer/cuadrilla         # the GitHub repo
+/plugin marketplace add <your-user>/cuadrilla         # the GitHub repo
 /plugin install cuadrilla@cuadrilla                      # choose the response language
 /plugin install cuadrilla-python-fastapi@cuadrilla       # the packs for your stacks
 /plugin install cuadrilla-react@cuadrilla
@@ -115,13 +115,14 @@ See [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md), [docs/CONFIG.md](docs/CO
 
 | Server | Plugin | Setup |
 |---|---|---|
-| `github` | core | `GITHUB_PAT` environment variable (fine-grained token, this repo only) |
-| `atlassian` | core | OAuth via `/mcp` |
+| `github` | core | **Optional.** `GITHUB_PAT` environment variable (fine-grained token, this repo only). Without it the server shows as failed in `/mcp` ("Authorization header is badly formatted"); that is expected and harmless: Cuadrilla falls back to the `gh` CLI |
+| `atlassian` | core | **Optional.** OAuth via `/mcp`; only needed for Jira/Confluence. Shows as "needs auth" until you log in |
 | `playwright` | core | none (used by the `qa` agent) |
 | `postgres` (read-only) | python-fastapi, node-typescript | `POSTGRES_MCP_DSN` pointing to a **local** database |
 | `microsoft-learn` | dotnet | none |
 
 Credentials are only read from environment variables; nothing secret is stored in the plugins.
+See [MCP credentials](docs/GETTING-STARTED.md#4-mcp-credentials-optional) for how to set them on Windows, macOS and Linux.
 
 ## Security model
 

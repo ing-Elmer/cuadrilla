@@ -21,7 +21,9 @@ and propose fixes.
 5. **Packs:** each component's `stack` has its pack installed (its agent and `stack-<id>` skill
    are available); otherwise give the `/plugin install <pack>@cuadrilla` command.
 6. **MCP:** which cuadrilla MCP servers are connected (`/mcp` shows them); for `github`, whether the
-   `GITHUB_PAT` environment variable is set (check existence only — **never print it**).
+   `GITHUB_PAT` environment variable is set (check existence only — **never print it**). `github` and
+   `atlassian` are optional: report a missing `GITHUB_PAT` or pending Atlassian OAuth as ⚠️ (not ❌) and
+   say the `gh` CLI is used instead.
 7. **GitHub:** `.github/workflows/ci.yml` has one `ci-<name>` job per component with the same
    steps as `checks`; `claude-review.yml` exists and pins the action by SHA.
 

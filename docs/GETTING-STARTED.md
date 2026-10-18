@@ -74,7 +74,23 @@ Set environment variables in your OS (never in the repo):
   read-only `postgres` MCP of the Python and Node packs.
 - Atlassian: run `/mcp` and log in.
 
+How to set an environment variable (then **restart Claude Code**):
+
+| OS | Command |
+|---|---|
+| Windows (PowerShell) | `setx GITHUB_PAT "<token>"` |
+| macOS / Linux | add `export GITHUB_PAT="<token>"` to `~/.zshrc` or `~/.bashrc` |
+
+Both MCP servers are optional. If you don't set them up, `/mcp` and `/cuadrilla:doctor` will list
+`github` as failed ("Authorization header is badly formatted") and `atlassian` as "needs OAuth".
+That is expected: everything else works, and GitHub tasks use the `gh` CLI instead.
+
 ## 5. Troubleshooting
+
+- **`github` MCP shows as failed ("Authorization header is badly formatted").** `GITHUB_PAT` is not
+  set. Set it (section 4) and restart Claude Code, or ignore it and use the `gh` CLI.
+- **"Session-context hook not seen" in `/cuadrilla:doctor`.** The plugin was installed after the
+  session started. Restart Claude Code.
 
 - **A hook blocked something legitimate.** Read the reason. Secret file false positive → adjust
   `protectedPaths`; pattern false positive → adjust `forbidden` / `builtinPatterns` in
