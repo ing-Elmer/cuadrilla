@@ -4,7 +4,17 @@
 // Facts only, phrased as statements.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CONFIG_PATH, git, loadConfig, projectRoot, readInput, respond, responseLanguage } from "./lib.mjs";
+import {
+  agentBranchPrefix,
+  CONFIG_PATH,
+  git,
+  loadConfig,
+  projectRoot,
+  readInput,
+  respond,
+  responseLanguage,
+  unattendedMode,
+} from "./lib.mjs";
 
 const input = await readInput();
 const root = projectRoot(input);
@@ -66,5 +76,19 @@ lines.push(
   "- Nobody pushes, merges or approves PRs, runs SQL or migrations without explicit confirmation, deploys, or writes secrets. The guard hook enforces this; a block is explained to the user, never worked around.",
   "- Temporary files (logs, tokens, JSON responses, screenshots) go to the session scratchpad, never into the repo.",
 );
+
+if (unattendedMode()) {
+  const prefix = agentBranchPrefix();
+  lines.push(
+    "",
+    "cuadrilla UNATTENDED MODE — nobody is watching this session and nobody can answer a question or a confirmation:",
+    "- Never stop to ask. Make the most reasonable decision, write it down in the PR description under 'Decisions taken', and continue.",
+    "- Anything that would need a confirmation (merge/rebase, SQL, migrations, forced installs) is blocked: do not attempt it. Leave a migration script unexecuted and say so in the PR.",
+    `- Work on a branch named ${prefix}<ticket or short-description>, never on the base branch.`,
+    `- When the work is done and its checks pass, push exactly with \`git push -u origin ${prefix}<name>\` (one command, nothing chained) and open the PR with \`gh pr create --draft\`.`,
+    "- If the checks cannot be made to pass, still push the branch and open the draft PR, with the failing check and what was tried listed at the top of the description.",
+    "- Never merge, approve or mark a PR as ready: a person reviews every change.",
+  );
+}
 
 respond({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: lines.join("\n") } });

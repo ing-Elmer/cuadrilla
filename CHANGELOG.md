@@ -3,6 +3,26 @@
 All notable changes to cuadrilla are documented here. Versions follow semantic versioning; every
 plugin's `plugin.json` carries its own version.
 
+## 1.1.0 — unattended mode
+
+### Core (`cuadrilla`)
+- **Unattended mode** for runs with nobody watching (scheduler, CI, OpenJarvis), enabled only
+  from the runner's environment with `CUADRILLA_UNATTENDED=1` (never from the repository):
+  - `guard`: every "ask" becomes a deny; exactly one plain `git push [-u] origin <prefix><name>`
+    is allowed (`CUADRILLA_AGENT_BRANCH_PREFIX`, default `agent/`); `gh pr create` must be
+    `--draft`. Force, delete, tags, mirror, several refspecs, other remotes and chained or
+    wrapped pushes stay denied, as do merging, approving and marking PRs ready. So that the
+    allowed push can only reach the original `origin`, remote edits, URL rewrites
+    (`insteadOf`, `pushurl`), `git -c`, `GIT_CONFIG*`/`GIT_DIR` and edits inside `.git/` are
+    denied too.
+  - `session-context`: tells the agents they are unattended, which push is allowed and how to
+    finish.
+  - `/cuadrilla:ticket` runs end to end without confirmations — agent branch, commit, push and a
+    draft PR with the criterion report, failing checks first and **Decisions taken**.
+    `/cuadrilla:feature`, `/cuadrilla:commit`, `/cuadrilla:pr` and the orchestrator skip their
+    confirmations in this mode.
+- 53 new hook tests (150 total).
+
 ## 1.0.0 — first release (MIT)
 
 ### Core (`cuadrilla`)

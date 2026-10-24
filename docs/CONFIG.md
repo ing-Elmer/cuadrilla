@@ -65,3 +65,14 @@ Human-facing facts (domain, connections, roles, deploy targets) live in the
 
 Without this file the hooks still work with built-in defaults (ruff, Prettier, gofmt; built-in
 patterns for Python, JS/TS, C#, Java/Kotlin, Go and Rust).
+
+## Environment variables (not in this file)
+
+Some settings are deliberately **not** read from `.claude/cuadrilla.json`: the agent can edit files
+in the repository, so a switch that loosens a guardrail must live where the agent can't reach it.
+The runner that starts `claude` sets them in its environment.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `CUADRILLA_UNATTENDED` | off | `1`, `true`, `yes` or `on` turns on unattended mode: every guard "ask" becomes a deny, one plain push to an agent branch is allowed, `gh pr create` must be `--draft`, and the agents are told not to stop and ask. See the README's *Unattended mode*. |
+| `CUADRILLA_AGENT_BRANCH_PREFIX` | `agent/` | Branch prefix the unattended push may target. Must be a plain segment ending in `/` (e.g. `bot/`); anything else falls back to the default. |

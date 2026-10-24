@@ -31,3 +31,7 @@ Recent commits (to match the style):
 5. Show the message and **wait for OK** before `git commit`. If a pre-commit hook fails, show the
    error and fix the cause: never `--no-verify`.
 6. Never `git push`.
+
+In **unattended mode** (stated in the session context) nobody can confirm: stage the files from
+step 2 yourself, keep the same exclusions, and commit without waiting in step 5. Pushing is
+covered by `/cuadrilla:ticket`'s unattended flow, not by this command.

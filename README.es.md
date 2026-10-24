@@ -45,6 +45,30 @@ Los comandos, hooks y servidores MCP están detallados en el [README en inglés]
 
 **Nota sobre MCP:** `github` (necesita `GITHUB_PAT`) y `atlassian` (OAuth con `/mcp`) son opcionales. Si no los configuras, `/mcp` mostrará `github` como fallido ("Authorization header is badly formatted"); es esperado y no afecta nada más: Cuadrilla usa el CLI `gh`. En Windows: `setx GITHUB_PAT "<token>"` y reinicia Claude Code.
 
+## Modo desatendido
+
+Para que el equipo trabaje sin nadie mirando (desde un programador de tareas, un job de CI o
+un runner de agentes como OpenJarvis) y revisar el resultado como un PR en borrador. El
+runner define las variables en el entorno del proceso `claude`; no se pueden activar desde el
+repositorio, así que el agente no puede activárselas solo.
+
+```bash
+export CUADRILLA_UNATTENDED=1
+export CUADRILLA_AGENT_BRANCH_PREFIX=agent/   # opcional, es el valor por defecto
+claude -p "/cuadrilla:ticket #42"
+```
+
+- Todo lo que pedía confirmación (merge/rebase, SQL, migraciones, instalaciones forzadas) pasa
+  a estar bloqueado.
+- Se permite un único push: `git push [-u] origin <prefijo><nombre>`, como comando solo.
+- `gh pr create` tiene que usar `--draft`. Mergear, aprobar o marcar como listo sigue prohibido.
+- Los agentes no se detienen a preguntar, registran sus **decisiones tomadas** y
+  `/cuadrilla:ticket` termina en un PR en borrador con los checks fallidos al principio.
+
+Ejecútalo en un contenedor o VM descartable, con un clon limpio, un token de grano fino limitado a
+ese repositorio y protección de rama en la rama base. Detalle en el
+[README en inglés](README.md#unattended-mode).
+
 ## Instalación
 
 Requisitos: Claude Code, Node.js ≥ 18 (hooks) y git. Opcionales: `gh`, Docker.

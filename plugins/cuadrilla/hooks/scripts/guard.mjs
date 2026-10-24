@@ -7,7 +7,13 @@
 //       repo secrets, deploys and infra changes, publishing packages, unsandboxed agents,
 //       reading/dumping secret files or the environment, writing secrets into files.
 // ask:  SQL against a database, running DB migrations, merge/rebase, force-installs.
+//
+// Unattended mode (CUADRILLA_UNATTENDED=1, set by the runner, see lib.mjs): nobody can answer a
+// confirmation, so every "ask" becomes a deny. Exactly two things open up, both reviewable by a
+// person afterwards: a plain `git push origin <agent branch>` (prefix CUADRILLA_AGENT_BRANCH_PREFIX,
+// default "agent/") and `gh pr create --draft`. Merging, approving and marking ready stay denied.
 import {
+  agentBranchPrefix,
   ask,
   commandTouchesProtected,
   deny,
@@ -15,14 +21,20 @@ import {
   loadConfig,
   projectRoot,
   readInput,
+  unattendedMode,
 } from "./lib.mjs";
 
 // "git <options> <subcommand>" within one command segment (up to | ; & or newline).
 const GIT = String.raw`\bgit\b[^|;&\n]*?\s`;
 const SEG = String.raw`[^|;&\n]*`;
 
+const UNATTENDED = unattendedMode();
+const AGENT_PREFIX = agentBranchPrefix();
+
+const PUSH = new RegExp(`${GIT}push\\b`, "i");
+
 const DENY = [
-  [new RegExp(`${GIT}push\\b`, "i"), "git push is not allowed: a person pushes."],
+  [PUSH, "git push is not allowed: a person pushes."],
   [new RegExp(`${GIT}reset\\b${SEG}--hard\\b`, "i"), "git reset --hard discards work irreversibly."],
   [new RegExp(`${GIT}clean\\b${SEG}\\s-\\w*f`, "i"), "git clean -f deletes untracked files."],
   [new RegExp(`${GIT}(?:filter-branch|filter-repo)\\b`, "i"), "Rewriting git history is not allowed."],
@@ -91,9 +103,95 @@ function executableText(command) {
   return [stripped, ...inner].join("\n");
 }
 
+/** A git branch name that is safe to push: no traversal, no ref tricks, no trailing slash. */
+function isSafeBranchName(name) {
+  return (
+    /^[A-Za-z0-9._/-]+$/.test(name) &&
+    !name.includes("..") &&
+    !name.includes("//") &&
+    !name.endsWith("/") &&
+    !name.endsWith(".lock") &&
+    !/(?:^|\/)[.-]/.test(name)
+  );
+}
+
+/**
+ * Unattended mode only: true when `command` is exactly one plain push of one agent branch to
+ * origin, e.g. `git push -u origin agent/42-login` or `git push origin HEAD:agent/42-login`.
+ * Anything else — chaining, substitution, quotes, force, delete, tags, mirror, several refspecs,
+ * a remote other than origin, or a destination outside the agent prefix — is not a match, so
+ * the regular push deny applies.
+ */
+function isAllowedAgentPush(command, prefix = AGENT_PREFIX) {
+  if (/[|;&\n`$<>()"'\\]/.test(command)) return false;
+  const tokens = command.trim().split(/\s+/);
+  let i = 0;
+  if (tokens[i++] !== "git") return false;
+  if (tokens[i] === "-C") {
+    if (!tokens[i + 1] || tokens[i + 1].startsWith("-")) return false;
+    i += 2;
+  }
+  if (tokens[i++] !== "push") return false;
+
+  const positional = [];
+  for (const token of tokens.slice(i)) {
+    if (token === "-u" || token === "--set-upstream") continue;
+    if (token.startsWith("-")) return false; // --force, -f, --delete, --tags, --mirror, --all…
+    positional.push(token);
+  }
+  if (positional.length !== 2 || positional[0] !== "origin") return false;
+
+  const refspec = positional[1];
+  if (refspec.startsWith("+")) return false; // "+src:dst" is a force push
+  const parts = refspec.split(":");
+  if (parts.length > 2) return false;
+  const [source, destination = source] = parts;
+  if (!source || !destination) return false; // ":dst" deletes the remote branch
+  if (source !== "HEAD" && !isSafeBranchName(source.replace(/^refs\/heads\//, ""))) return false;
+  const branch = destination.replace(/^refs\/heads\//, "");
+  return branch.startsWith(prefix) && branch.length > prefix.length && isSafeBranchName(branch);
+}
+
+// Unattended mode allows pushing to `origin`, so where `origin` points must not change: no
+// remote edits, no URL rewrites (insteadOf / pushurl), no per-command config, no edits to
+// .git/config. Otherwise the one allowed push could send the code anywhere.
+const REMOTE_TAMPERING = [
+  new RegExp(`${GIT}remote\\s+(?:add|set-url|rename|remove|rm|set-head|set-branches)\\b`, "i"),
+  new RegExp(`${GIT}config\\b${SEG}(?:\\bremote\\.|\\burl\\.|insteadof|pushurl|\\binclude(?:if)?\\.)`, "i"),
+  /\bgit\s+(?:-C\s+\S+\s+)?-c\s/, // case-sensitive: -C is the directory flag
+  /\bGIT_(?:CONFIG\w*|DIR|SSH\w*|ASKPASS)\s*=/i,
+  /(?:^|[\s/\\"'=])\.git[/\\]+(?:config|hooks|info)\b/i,
+];
+
+function isGitInternalsPath(path) {
+  return typeof path === "string" && /(?:^|[/\\])\.git(?:[/\\]|$)/.test(path);
+}
+
+/** With nobody to confirm, a confirmation request would hang the run: it becomes a deny. */
+function askOrDeny(reason) {
+  if (UNATTENDED) deny(`Blocked by cuadrilla guard (unattended mode, nobody can confirm): ${reason}`);
+  ask(reason);
+}
+
 function checkCommand(original, protectedExtra) {
   const command = executableText(original);
-  for (const [pattern, reason] of DENY) if (pattern.test(command)) deny(`Blocked by cuadrilla guard: ${reason}`);
+  if (UNATTENDED && REMOTE_TAMPERING.some((pattern) => pattern.test(command) || pattern.test(original))) {
+    deny("Blocked by cuadrilla guard (unattended mode): git remotes, URL rewrites and git config are not changed, so the allowed push can only reach the original origin.");
+  }
+  const agentPush = UNATTENDED && isAllowedAgentPush(original);
+  for (const [pattern, reason] of DENY) {
+    if (pattern === PUSH && agentPush) continue;
+    if (pattern.test(command)) {
+      const hint =
+        pattern === PUSH && UNATTENDED
+          ? ` In unattended mode only \`git push [-u] origin ${AGENT_PREFIX}<name>\` is allowed, as a single command.`
+          : "";
+      deny(`Blocked by cuadrilla guard: ${reason}${hint}`);
+    }
+  }
+  if (UNATTENDED && /\bgh\s+pr\s+create\b/i.test(command) && !/\s(?:--draft|-d)\b/.test(command)) {
+    deny("Blocked by cuadrilla guard (unattended mode): pull requests are opened as drafts (`gh pr create --draft`) so a person reviews them.");
+  }
   if (commandTouchesProtected(command, protectedExtra)) {
     deny(
       "Blocked by cuadrilla guard: secret files (.env, keys, certificates, credentials) are not read or modified " +
@@ -101,9 +199,9 @@ function checkCommand(original, protectedExtra) {
     );
   }
   if (SQL_CLIENTS.test(command) && (SQL_WRITE.test(original) || /\s(?:-f|-i|--file|<)\s*\S/.test(original))) {
-    ask("SQL against a database: requires the user's explicit confirmation.");
+    askOrDeny("SQL against a database: requires the user's explicit confirmation.");
   }
-  for (const [pattern, reason] of ASK) if (pattern.test(command)) ask(reason);
+  for (const [pattern, reason] of ASK) if (pattern.test(command)) askOrDeny(reason);
 }
 
 function findSecret(text) {
@@ -136,6 +234,9 @@ if (tool === "Bash" || tool === "PowerShell") {
       : [data.file_path, data.path, data.notebook_path, tool === "Glob" ? data.pattern : undefined];
   if (paths.some((p) => typeof p === "string" && isProtectedPath(p, protectedExtra))) {
     deny("Blocked by cuadrilla guard: secret files are not read, searched or edited. Use the .example file.");
+  }
+  if (UNATTENDED && ["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(tool) && paths.some(isGitInternalsPath)) {
+    deny("Blocked by cuadrilla guard (unattended mode): files inside .git/ are not edited.");
   }
   if (tool === "Write" || tool === "Edit" || tool === "MultiEdit") {
     const texts = [data.content, data.new_string, ...(data.edits ?? []).map((edit) => edit?.new_string)];

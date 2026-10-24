@@ -12,7 +12,9 @@ Build the feature: **$ARGUMENTS**
    per layer.
 3. If it spans components, write the **contract** (endpoint, method, request/response DTOs in
    camelCase, envelope, error codes, permission code, migrations needed).
-4. Show the plan (files per component, contract, migrations, tests) and **wait for OK**.
+4. Show the plan (files per component, contract, migrations, tests) and **wait for OK**. In
+   unattended mode (stated in the session context) don't wait: keep the plan in the final report
+   and record every choice you made under **Decisions taken**.
 5. Implement: for each component launch its `agent` (from cuadrilla.json) in parallel with the
    contract, the reference feature, and the instruction to follow its pack's feature skill if the
    pack has one (`cuadrilla-<pack>:feature-<id>`). Migration scripts are written first and never

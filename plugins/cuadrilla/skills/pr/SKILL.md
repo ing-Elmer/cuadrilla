@@ -30,3 +30,7 @@ Return the text ready to paste. If the branch is already on the remote and has n
 OK**. If the branch isn't pushed, tell the user to push it themselves.
 
 Never push, merge, approve or mark the PR as ready.
+
+In **unattended mode** (stated in the session context) skip the questions in step 1 and the OK
+in step 3: run `/cuadrilla:verify` first and put its real result at the top of the description,
+and create the PR only as a draft. The branch is pushed by `/cuadrilla:ticket`'s unattended flow.

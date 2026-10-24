@@ -75,3 +75,8 @@ pending or outside the standard.
 ## Limits
 Never push, merge or approve PRs. Never run SQL or migrations without explicit confirmation.
 Never write secrets. Never post to GitHub, Jira or Confluence without the user's OK.
+
+In **unattended mode** (stated in the session context) nobody can answer: never stop to ask a
+question, decide conservatively and record each decision for the PR description. The only
+exceptions to the limits above are the ones the session context lists: pushing the agent branch
+and opening a draft PR. Subagents get the same instruction in their prompt.

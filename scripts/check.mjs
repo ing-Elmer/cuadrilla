@@ -156,7 +156,7 @@ else if (yamlCheck.status !== 0) for (const line of yamlCheck.stdout.trim().spli
 
 // 6. Hook tests
 const tests = spawnSync(process.execPath, ["--test", join(ROOT, "plugins", "cuadrilla", "hooks", "tests", "hooks.test.mjs")], { encoding: "utf8" });
-const summary = /ℹ pass (\d+)[\s\S]*?ℹ fail (\d+)/.exec(tests.stdout);
+const summary = /[ℹ#] pass (\d+)[\s\S]*?[ℹ#] fail (\d+)/.exec(tests.stdout);
 if (tests.status !== 0) failures.push(`hook tests failed (${summary ? `${summary[2]} failing` : "see node --test output"})`);
 else notes.push(`hook tests: ${summary?.[1] ?? "?"} passed`);
 

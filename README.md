@@ -84,7 +84,7 @@ It works with **any language**. Stack packs add deep, opinionated rules for Pyth
 
 | Hook | When | What |
 |---|---|---|
-| `guard` | before every tool | **Denies** push, history rewrites, recursive deletes, `--no-verify`, merging/approving PRs, repo secrets, deploys, cloud/cluster/IaC changes, package publishing, unsandboxed agents, reading/dumping secret files or the environment, writing secrets. **Asks** before SQL, migrations, merge/rebase, forced installs. |
+| `guard` | before every tool | **Denies** push, history rewrites, recursive deletes, `--no-verify`, merging/approving PRs, repo secrets, deploys, cloud/cluster/IaC changes, package publishing, unsandboxed agents, reading/dumping secret files or the environment, writing secrets. **Asks** before SQL, migrations, merge/rebase, forced installs. In [unattended mode](#unattended-mode) every "ask" becomes a deny. |
 | `format` | after every edit | Runs the component's formatter/linter from `cuadrilla.json` (or ruff / Prettier / gofmt by default) and feeds lint errors back to Claude. |
 | `stop-check` | before ending a turn | Scans added lines for forbidden patterns — built-in for Python, JS/TS, C#, Java/Kotlin, Go, Rust, plus each pack's and project's own — and hands the turn back once. |
 | `session-context` | session start | Branch, pending changes, profile/config status and the team's ground rules. |
@@ -123,6 +123,35 @@ See [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md), [docs/CONFIG.md](docs/CO
 
 Credentials are only read from environment variables; nothing secret is stored in the plugins.
 See [MCP credentials](docs/GETTING-STARTED.md#4-mcp-credentials-optional) for how to set them on Windows, macOS and Linux.
+
+## Unattended mode
+
+Run the team with nobody watching — from a scheduler, a CI job or an agent runner such as
+OpenJarvis — and review the result as a draft PR. The runner sets the variables in the
+environment of the `claude` process; they can't be turned on from the repository, so the agent
+can't enable them for itself.
+
+```bash
+export CUADRILLA_UNATTENDED=1
+export CUADRILLA_AGENT_BRANCH_PREFIX=agent/   # optional, this is the default
+claude -p "/cuadrilla:ticket #42"
+```
+
+What changes:
+
+- **Confirmations become denies.** Merge/rebase, SQL, migrations and forced installs are
+  blocked, because a confirmation nobody answers would hang the run.
+- **One push is allowed:** exactly `git push [-u] origin <prefix><name>`, as a single command.
+  Force, delete, tags, mirror, several refspecs, other remotes, chained or wrapped commands and
+  any other branch stay denied. Remotes, URL rewrites, `git -c` and `.git/` can't be changed,
+  so that push can only reach the original `origin`.
+- **PRs are drafts:** `gh pr create` must use `--draft`. Merging, approving and marking ready
+  stay denied.
+- The agents are told at session start: they don't stop to ask, they record their **Decisions
+  taken**, and `/cuadrilla:ticket` ends with a draft PR that puts failing checks first.
+
+Run it in a disposable container or VM with a clean clone, a fine-grained token limited to that
+repository (contents and pull requests), and branch protection on the base branch.
 
 ## Security model
 

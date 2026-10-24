@@ -187,6 +187,28 @@ export function commandTouchesProtected(command, extra = []) {
   });
 }
 
+// --- Unattended mode ------------------------------------------------------------------------
+// A runner (CI, a scheduler, OpenJarvis…) that starts Claude Code with nobody watching sets
+// CUADRILLA_UNATTENDED=1 in the environment of the claude process. It is read ONLY from the
+// environment, never from .claude/cuadrilla.json: the agent can edit files in the repo, but it
+// cannot change the environment its own hooks run in.
+
+const DEFAULT_AGENT_BRANCH_PREFIX = "agent/";
+
+/** True when the session runs with nobody available to answer a confirmation. */
+export function unattendedMode(env = process.env) {
+  return /^(?:1|true|yes|on)$/i.test(String(env.CUADRILLA_UNATTENDED ?? "").trim());
+}
+
+/**
+ * Branch prefix the agent may push to in unattended mode (default "agent/"). A prefix must be
+ * a plain path segment ending in "/" so it can never match a base branch like "main".
+ */
+export function agentBranchPrefix(env = process.env) {
+  const value = String(env.CUADRILLA_AGENT_BRANCH_PREFIX ?? "").trim();
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*\/$/.test(value) ? value : DEFAULT_AGENT_BRANCH_PREFIX;
+}
+
 /** Response language chosen when the plugin was enabled (or the project override). */
 export function responseLanguage(config) {
   return config.language || process.env.CLAUDE_PLUGIN_OPTION_RESPONSE_LANGUAGE || "English";
