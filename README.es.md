@@ -33,7 +33,7 @@ Python/FastAPI, .NET, Node/TypeScript, Java/Spring y React.
 
 | Plugin | Qué agrega |
 |---|---|
-| `cuadrilla` (núcleo) | 8 agentes · 7 skills de estándar · 17 comandos · 4 hooks · MCP de GitHub, Atlassian y Playwright |
+| `cuadrilla` (núcleo) | 8 agentes · 7 skills de estándar · 18 comandos · 5 hooks · MCP de GitHub, Atlassian y Playwright |
 | `cuadrilla-python-fastapi` | Python + FastAPI + PostgreSQL (psycopg 3, SQL a mano, uv/ruff/mypy/pytest) |
 | `cuadrilla-dotnet` | .NET + ASP.NET Core (4 proyectos, Dapper o EF Core, FluentValidation, xUnit) |
 | `cuadrilla-node-typescript` | API en Node + TypeScript (Fastify, Zod, pg/Kysely, Vitest) |
@@ -44,6 +44,21 @@ Python/FastAPI, .NET, Node/TypeScript, Java/Spring y React.
 Los comandos, hooks y servidores MCP están detallados en el [README en inglés](README.md#commands).
 
 **Nota sobre MCP:** `github` (necesita `GITHUB_PAT`) y `atlassian` (OAuth con `/mcp`) son opcionales. Si no los configuras, `/mcp` mostrará `github` como fallido ("Authorization header is badly formatted"); es esperado y no afecta nada más: Cuadrilla usa el CLI `gh`. En Windows: `setx GITHUB_PAT "<token>"` y reinicia Claude Code.
+
+## Métricas
+
+Los hooks llevan un registro local en `.claude/cuadrilla/metrics.jsonl` de lo que frena al
+equipo: qué regla de `guard` bloqueó o pidió confirmación, qué patrones prohibidos encontró
+`stop-check` (por patrón y extensión), cuántos errores de lint tuvo cada componente y qué agentes,
+skills y comandos se usaron. `/cuadrilla:report` lo convierte en un informe y explica los tres
+patrones que más se repiten con una corrección concreta, para mejorar el estándar con evidencia.
+
+- **Nunca registra** comandos, prompts, descripciones de tareas, código, rutas de archivos ni
+  secretos.
+- **No sale de la máquina:** la carpeta se ignora a sí misma en git y no se envía nada.
+- `/cuadrilla:report 30 anonymous` además oculta los nombres de componentes y las reglas del
+  proyecto y quita los ids de sesión, para compartirlo con quien mantiene el kit.
+- Se apaga con `"metrics": false` en `.claude/cuadrilla.json` o con `CUADRILLA_METRICS=off`.
 
 ## Modo desatendido
 

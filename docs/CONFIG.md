@@ -46,7 +46,8 @@ Human-facing facts (domain, connections, roles, deploy targets) live in the
   ],
   "protectedPaths": ["appsettings.Production.json"], // extra secret files for the guard hook
   "stopCheck": true,                // false disables the stop-check hook
-  "builtinPatterns": true           // false keeps only the "forbidden" list
+  "builtinPatterns": true,          // false keeps only the "forbidden" list
+  "metrics": true                   // false stops writing .claude/cuadrilla/metrics.jsonl
 }
 ```
 
@@ -62,6 +63,7 @@ Human-facing facts (domain, connections, roles, deploy targets) live in the
 | `components[].audit` | `/cuadrilla:security-audit`, `/cuadrilla:deploy-check` | Read-only audit command. |
 | `forbidden[]` | stop-check hook | `pattern` is a JavaScript regex (escape backslashes in JSON). `tests: false` skips test files. |
 | `protectedPaths[]` | guard hook | Globs; a glob without `/` matches the file name anywhere. |
+| `metrics` | every hook, `/cuadrilla:report` | `false` turns the local metrics off. Turning them **on** is the default, so this can only make the hooks record less. |
 
 Without this file the hooks still work with built-in defaults (ruff, Prettier, gofmt; built-in
 patterns for Python, JS/TS, C#, Java/Kotlin, Go and Rust).
@@ -75,4 +77,5 @@ The runner that starts `claude` sets them in its environment.
 | Variable | Default | Effect |
 |---|---|---|
 | `CUADRILLA_UNATTENDED` | off | `1`, `true`, `yes` or `on` turns on unattended mode: every guard "ask" becomes a deny, one plain push to an agent branch is allowed, `gh pr create` must be `--draft`, and the agents are told not to stop and ask. See the README's *Unattended mode*. |
+| `CUADRILLA_METRICS` | on | `off`, `0`, `false` or `no` stops writing local metrics, whatever the config says. |
 | `CUADRILLA_AGENT_BRANCH_PREFIX` | `agent/` | Branch prefix the unattended push may target. Must be a plain segment ending in `/` (e.g. `bot/`); anything else falls back to the default. |

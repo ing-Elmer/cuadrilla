@@ -25,6 +25,29 @@
             "onFailure": "block"
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task|Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/usage.mjs"],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/usage.mjs"],
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUse": [

@@ -8,7 +8,7 @@
 //          + project/pack patterns in .claude/cuadrilla.json → "forbidden": [{ glob, pattern, message, tests }]
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { git, loadConfig, matchesGlob, projectRoot, readInput, respond } from "./lib.mjs";
+import { fileExtension, git, loadConfig, matchesGlob, projectRoot, readInput, recordEvent, respond } from "./lib.mjs";
 
 const input = await readInput();
 if (input.stop_hook_active) process.exit(0);
@@ -88,7 +88,7 @@ function addedLines() {
 
 const rules = [];
 if (config.builtinPatterns !== false) {
-  for (const [glob, regex, message, tests] of BUILTIN) rules.push({ glob, regex, message, tests });
+  for (const [glob, regex, message, tests] of BUILTIN) rules.push({ glob, regex, message, tests, source: "builtin" });
 }
 for (const entry of Array.isArray(config.forbidden) ? config.forbidden : []) {
   try {
@@ -97,6 +97,7 @@ for (const entry of Array.isArray(config.forbidden) ? config.forbidden : []) {
       regex: new RegExp(entry.pattern, entry.flags ?? ""),
       message: entry.message ?? `forbidden pattern ${entry.pattern}`,
       tests: entry.tests !== false,
+      source: "project",
     });
   } catch {
     // An invalid project regex must not break the hook; it is reported below.
@@ -105,14 +106,26 @@ for (const entry of Array.isArray(config.forbidden) ? config.forbidden : []) {
 }
 
 const findings = [];
+const counted = new Map(); // metrics: [source, message, ext] → count, no paths or code
 for (const { file, line, text } of addedLines()) {
   if (!isSource(file)) continue;
   const test = isTest(file);
   for (const rule of rules) {
     if (rule.invalid) continue;
     if (!rule.tests && test) continue;
-    if (matchesGlob(file, rule.glob) && rule.regex.test(text)) findings.push(`- ${file}:${line} — ${rule.message}`);
+    if (matchesGlob(file, rule.glob) && rule.regex.test(text)) {
+      findings.push(`- ${file}:${line} — ${rule.message}`);
+      const key = JSON.stringify([rule.source, rule.message, fileExtension(file)]);
+      counted.set(key, (counted.get(key) ?? 0) + 1);
+    }
   }
+}
+if (counted.size) {
+  const patterns = [...counted].map(([key, count]) => {
+    const [source, rule, ext] = JSON.parse(key);
+    return { rule, source, ext, count };
+  });
+  recordEvent(root, config, input, { kind: "stop-check", findings: findings.length, patterns });
 }
 
 const notes = [];

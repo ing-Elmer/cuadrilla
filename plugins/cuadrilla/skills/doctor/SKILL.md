@@ -12,8 +12,12 @@ and propose fixes.
    `checks` commands: `uv`, `npm`, `dotnet`, `./mvnw`/`java`, `go`, `cargo`…).
 2. **Hooks:** confirm the session-context information appeared at session start. Then run the
    guard hook on a harmless and a forbidden sample by piping JSON to it:
-   `echo '{"tool_name":"Bash","tool_input":{"command":"git push"}}' | node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard.mjs"`
-   must print a `deny` decision; the same with `git status` must print nothing.
+   `echo '{"tool_name":"Bash","tool_input":{"command":"git push"}}' | CUADRILLA_METRICS=off node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard.mjs"`
+   must print a `deny` decision; the same with `git status` must print nothing. Keep
+   `CUADRILLA_METRICS=off` (in PowerShell: `$env:CUADRILLA_METRICS='off'` first, then remove it)
+   so the sample block isn't counted in the metrics. **Metrics:** on or off (`"metrics"` in the
+   config, `CUADRILLA_METRICS`), and the size and date range of `.claude/cuadrilla/metrics.jsonl`
+   if it exists.
 3. **Config:** `.claude/cuadrilla.json` parses; every component path exists; every
    `forbidden[].pattern` compiles as a JavaScript regex; `format`/`lint` entries are arrays whose
    first element is an available command.

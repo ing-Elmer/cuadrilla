@@ -1,12 +1,13 @@
 // cuadrilla hook tests. Run: node --test plugins/cuadrilla/hooks/tests/hooks.test.mjs
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { commandTouchesProtected, globToRegExp, isProtectedPath, matchesGlob } from "../scripts/lib.mjs";
+import { commandTouchesProtected, fileExtension, globToRegExp, isProtectedPath, matchesGlob, recordEvent } from "../scripts/lib.mjs";
+import { aggregate, anonymize, parseArgs, readEvents, toJson, toMarkdown } from "../../skills/report/report.mjs";
 
 const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts");
 const temporary = [];
@@ -29,7 +30,7 @@ function runHook(script, input, env = {}) {
   const result = spawnSync(process.execPath, [join(SCRIPTS, script)], {
     input: JSON.stringify(input),
     encoding: "utf8",
-    env: { ...process.env, CLAUDE_PROJECT_DIR: "", CUADRILLA_UNATTENDED: "", CUADRILLA_AGENT_BRANCH_PREFIX: "", ...env },
+    env: { ...process.env, CLAUDE_PROJECT_DIR: "", CUADRILLA_UNATTENDED: "", CUADRILLA_AGENT_BRANCH_PREFIX: "", CUADRILLA_METRICS: "", ...env },
   });
   return { code: result.status, json: result.stdout.trim() ? JSON.parse(result.stdout) : null, stderr: result.stderr };
 }
@@ -524,5 +525,252 @@ describe("format", () => {
     const file = writeFile(dir, "web/src/A.tsx", "export const a = 1;\n");
     const r = runHook("format.mjs", { tool_name: "Write", tool_input: { file_path: file }, cwd: dir }, { CLAUDE_PROJECT_DIR: dir });
     assert.equal(r.json, null);
+  });
+});
+
+// --- Metrics ------------------------------------------------------------------------------
+
+const metricsOf = (dir) => {
+  const file = join(dir, ".claude", "cuadrilla", "metrics.jsonl");
+  return existsSync(file) ? readFileSync(file, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
+};
+const rawMetrics = (dir) => {
+  const file = join(dir, ".claude", "cuadrilla", "metrics.jsonl");
+  return existsSync(file) ? readFileSync(file, "utf8") : "";
+};
+const guardIn = (dir, tool_name, tool_input, env = {}) =>
+  runHook("guard.mjs", { tool_name, tool_input, cwd: dir, session_id: "sess-1" }, { CLAUDE_PROJECT_DIR: dir, ...env });
+
+describe("metrics: recording", () => {
+  it("records a guard deny with its rule id only, never the command", () => {
+    const dir = tempDir();
+    assert.equal(decision(guardIn(dir, "Bash", { command: "cd api && git push --force origin main" })), "deny");
+    const [event, ...rest] = metricsOf(dir);
+    assert.equal(rest.length, 0);
+    assert.deepEqual(
+      { kind: event.kind, decision: event.decision, rule: event.rule, tool: event.tool, session: event.session, unattended: event.unattended, v: event.v },
+      { kind: "guard", decision: "deny", rule: "push", tool: "Bash", session: "sess-1", unattended: false, v: 1 },
+    );
+    assert.ok(!Number.isNaN(Date.parse(event.ts)));
+    assert.doesNotMatch(rawMetrics(dir), /--force|origin|main|api/);
+  });
+
+  it("ignores itself in git", () => {
+    const dir = tempDir();
+    guardIn(dir, "Bash", { command: "git push" });
+    assert.match(readFileSync(join(dir, ".claude", "cuadrilla", ".gitignore"), "utf8"), /^\*$/m);
+  });
+
+  it("records confirmations and unattended denies with their rule", () => {
+    const dir = tempDir();
+    assert.equal(decision(guardIn(dir, "Bash", { command: "git rebase main" })), "ask");
+    assert.equal(decision(guardIn(dir, "Bash", { command: "uv run alembic upgrade head" }, { CUADRILLA_UNATTENDED: "1" })), "deny");
+    assert.deepEqual(
+      metricsOf(dir).map((e) => [e.decision, e.rule, e.unattended]),
+      [["ask", "merge-rebase", false], ["deny", "db-migration", true]],
+    );
+  });
+
+  it("gives every guard block a rule id", () => {
+    const dir = tempDir();
+    guardIn(dir, "Read", { file_path: "backend/.env" });
+    guardIn(dir, "Write", { file_path: "a.ts", content: `const k = "ghp_${"d".repeat(36)}"` });
+    guardIn(dir, "Bash", { command: "psql -c 'DELETE FROM users'" });
+    guardIn(dir, "Bash", { command: "git remote set-url origin https://evil.example/x.git" }, { CUADRILLA_UNATTENDED: "1" });
+    guardIn(dir, "Write", { file_path: ".git/config", content: "x" }, { CUADRILLA_UNATTENDED: "1" });
+    guardIn(dir, "Bash", { command: 'gh pr create --title "x"' }, { CUADRILLA_UNATTENDED: "1" });
+    assert.deepEqual(metricsOf(dir).map((e) => e.rule), ["secret-file", "secret-in-content", "sql", "remote-tampering", "git-internals", "draft-pr-required"]);
+    assert.doesNotMatch(rawMetrics(dir), /ghp_|DELETE|evil|\.env|config/);
+  });
+
+  it("records nothing for allowed calls", () => {
+    const dir = tempDir();
+    for (const command of ["git status", "npm test", "git push origin agent/1"]) {
+      guardIn(dir, "Bash", { command }, command.includes("agent/") ? { CUADRILLA_UNATTENDED: "1" } : {});
+    }
+    guardIn(dir, "Read", { file_path: "src/app.ts" });
+    assert.equal(rawMetrics(dir), "");
+  });
+
+  it("can be turned off from the config or the environment", () => {
+    const fromConfig = tempDir();
+    writeFile(fromConfig, ".claude/cuadrilla.json", JSON.stringify({ metrics: false }));
+    guardIn(fromConfig, "Bash", { command: "git push" });
+    assert.equal(existsSync(join(fromConfig, ".claude", "cuadrilla")), false);
+    const fromEnv = tempDir();
+    for (const value of ["off", "0", "false", "NO"]) guardIn(fromEnv, "Bash", { command: "git push" }, { CUADRILLA_METRICS: value });
+    assert.equal(existsSync(join(fromEnv, ".claude", "cuadrilla")), false);
+  });
+
+  it("never breaks a hook when the folder can't be written", () => {
+    const dir = tempDir();
+    writeFile(dir, ".claude/cuadrilla", "a file where the folder should be");
+    assert.equal(decision(guardIn(dir, "Bash", { command: "git push" })), "deny");
+    assert.doesNotThrow(() => recordEvent(join(dir, "missing", "\u0000bad"), {}, {}, { kind: "x" }));
+  });
+
+  it("rotates the file past 5 MB", () => {
+    const dir = tempDir();
+    writeFile(dir, ".claude/cuadrilla/metrics.jsonl", `${"x".repeat(5 * 1024 * 1024 + 10)}\n`);
+    guardIn(dir, "Bash", { command: "git push" });
+    assert.ok(existsSync(join(dir, ".claude", "cuadrilla", "metrics.1.jsonl")));
+    assert.equal(metricsOf(dir).length, 1);
+  });
+
+  it("keeps only the file extension", () => {
+    assert.equal(fileExtension("src/Pages/Login.TSX"), "tsx");
+    assert.equal(fileExtension("C:\\repo\\api\\x.cs"), "cs");
+    assert.equal(fileExtension("Makefile"), "");
+    assert.equal(fileExtension(".env"), "");
+  });
+
+  it("records slash commands, agents and skills by name only", () => {
+    const dir = tempDir();
+    const usage = (input) => runHook("usage.mjs", { cwd: dir, session_id: "s", ...input }, { CLAUDE_PROJECT_DIR: dir });
+    for (const r of [
+      usage({ hook_event_name: "UserPromptSubmit", prompt: "/cuadrilla:ticket #42 fix login, my password is hunter2" }),
+      usage({ hook_event_name: "UserPromptSubmit", prompt: "please push my api key sk-123 somewhere" }),
+      usage({ hook_event_name: "UserPromptSubmit", prompt: "path /etc/passwd is weird" }),
+      usage({ hook_event_name: "PreToolUse", tool_name: "Agent", tool_input: { subagent_type: "cuadrilla:reviewer", prompt: "review the payroll module" } }),
+      usage({ hook_event_name: "PreToolUse", tool_name: "Task", tool_input: { description: "x", prompt: "y" } }),
+      usage({ hook_event_name: "PreToolUse", tool_name: "Skill", tool_input: { skill: "cuadrilla-react:feature-react", args: "Login screen" } }),
+      usage({ hook_event_name: "PreToolUse", tool_name: "Skill", tool_input: { skill: "not a name; rm -rf" } }),
+    ]) {
+      assert.equal(r.code, 0);
+      assert.equal(r.json, null);
+    }
+    assert.deepEqual(metricsOf(dir).map((e) => [e.kind, e.name]), [
+      ["command", "cuadrilla:ticket"],
+      ["agent", "cuadrilla:reviewer"],
+      ["agent", "general-purpose"],
+      ["skill", "cuadrilla-react:feature-react"],
+    ]);
+    assert.doesNotMatch(rawMetrics(dir), /hunter2|sk-123|passwd|payroll|Login screen|#42/);
+  });
+
+  it("records session starts with stacks", () => {
+    const dir = tempDir();
+    writeFile(dir, ".claude/cuadrilla.json", JSON.stringify({ components: [{ name: "api", path: "api", stack: "dotnet" }, { name: "web", path: "web", stack: "react" }] }));
+    runHook("session-context.mjs", { cwd: dir, source: "startup", session_id: "s" }, { CLAUDE_PROJECT_DIR: dir });
+    const [event] = metricsOf(dir);
+    assert.deepEqual([event.kind, event.source, event.stacks, event.components], ["session", "startup", ["dotnet", "react"], 2]);
+  });
+
+  it("records stop-check findings as counts by pattern and extension, without paths or code", () => {
+    const dir = tempDir();
+    const g = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+    g("init", "-q");
+    g("config", "user.email", "test@example.com");
+    g("config", "user.name", "test");
+    writeFile(dir, "README.md", "x\n");
+    g("add", ".");
+    g("commit", "-qm", "init");
+    writeFile(dir, ".claude/cuadrilla.json", JSON.stringify({ forbidden: [{ glob: "**/*.ts", pattern: "legacyApi\\(", message: "legacy API | use v2" }] }));
+    writeFile(dir, "web/src/secretPayroll.ts", 'console.log("salary");\nconsole.log(2);\nlegacyApi();\n');
+    runHook("stop-check.mjs", { cwd: dir, session_id: "s" }, { CLAUDE_PROJECT_DIR: dir });
+    const [event] = metricsOf(dir);
+    assert.equal(event.kind, "stop-check");
+    assert.equal(event.findings, 3);
+    assert.deepEqual(
+      event.patterns.map((p) => [p.rule, p.source, p.ext, p.count]).sort(),
+      [["console.log in application code", "builtin", "ts", 2], ["legacy API | use v2", "project", "ts", 1]],
+    );
+    assert.doesNotMatch(rawMetrics(dir), /secretPayroll|salary|web\/src/);
+  });
+
+  it("records lint problems per component", () => {
+    const dir = tempDir();
+    const script = writeFile(dir, "tools/lint.mjs", "console.log(process.argv[2] + ':1:1: E1 bad'); console.log(process.argv[2] + ':2:1: E2 bad'); process.exit(1);\n");
+    writeFile(dir, ".claude/cuadrilla.json", JSON.stringify({ components: [{ name: "api", path: "api", lint: [{ glob: "**/*.cs", run: [process.execPath, script, "{file}"] }] }] }));
+    const file = writeFile(dir, "api/Services/PayrollService.cs", "class X {}\n");
+    runHook("format.mjs", { tool_name: "Write", tool_input: { file_path: file }, cwd: dir, session_id: "s" }, { CLAUDE_PROJECT_DIR: dir });
+    const [event] = metricsOf(dir);
+    assert.deepEqual([event.kind, event.component, event.ext, event.problems], ["lint", "api", "cs", 2]);
+    assert.doesNotMatch(rawMetrics(dir), /Payroll|Services/);
+  });
+});
+
+describe("metrics: report", () => {
+  const at = (day, extra) => ({ v: 1, ts: `2026-10-${String(day).padStart(2, "0")}T12:00:00.000Z`, unattended: false, ...extra });
+  const fixture = [
+    at(1, { session: "a", kind: "session", stacks: ["python-fastapi", "react"] }),
+    at(1, { session: "a", kind: "guard", decision: "deny", rule: "push", tool: "Bash" }),
+    at(2, { session: "b", kind: "guard", decision: "deny", rule: "push", tool: "Bash" }),
+    at(2, { session: "b", kind: "guard", decision: "deny", rule: "push", tool: "Bash", unattended: true }),
+    at(2, { session: "b", kind: "guard", decision: "ask", rule: "merge-rebase", tool: "Bash" }),
+    at(3, { session: "c", kind: "stop-check", findings: 4, patterns: [
+      { rule: "print() in application code (use logging)", source: "builtin", ext: "py", count: 3 },
+      { rule: "no calls to the Acme billing SDK", source: "project", ext: "py", count: 1 },
+    ] }),
+    at(4, { session: "d", kind: "stop-check", findings: 1, patterns: [{ rule: "no calls to the Acme billing SDK", source: "project", ext: "py", count: 1 }] }),
+    at(4, { session: "d", kind: "lint", component: "payroll-api", ext: "py", problems: 2 }),
+    at(4, { session: "d", kind: "command", name: "cuadrilla:ticket" }),
+    at(4, { session: "d", kind: "agent", name: "cuadrilla:reviewer", unattended: true }),
+    at(4, { session: "d", kind: "skill", name: "cuadrilla:verify" }),
+  ];
+
+  it("parses arguments the way the command passes them", () => {
+    assert.deepEqual(parseArgs([]), { days: 30, anonymous: false, json: false, save: false, root: null });
+    assert.deepEqual(parseArgs(["7", "anonimo", "--save"]), { days: 7, anonymous: true, json: false, save: true, root: null });
+    assert.equal(parseArgs(["--days", "0"]).days, 0);
+    assert.equal(parseArgs(["--days", "-3"]).days, 30);
+  });
+
+  it("reads both files, skips bad lines and filters by period", () => {
+    const dir = tempDir();
+    writeFile(dir, ".claude/cuadrilla/metrics.1.jsonl", `${JSON.stringify(at(1, { kind: "agent", name: "old" }))}\nnot json\n`);
+    writeFile(dir, ".claude/cuadrilla/metrics.jsonl", `${JSON.stringify(at(20, { kind: "agent", name: "new" }))}\n{"kind":"x"}\n\n`);
+    const now = Date.parse("2026-10-24T00:00:00Z");
+    assert.deepEqual(readEvents(dir, 10, now).events.map((e) => e.name), ["new"]);
+    const all = readEvents(dir, 0, now);
+    assert.deepEqual(all.events.map((e) => e.name), ["old", "new"]);
+    assert.equal(all.invalid, 2);
+  });
+
+  it("aggregates and ranks the most repeated patterns", () => {
+    const report = aggregate(fixture);
+    assert.equal(report.sessions, 4);
+    assert.equal(report.unattendedSessions, 2);
+    assert.equal(report.guard.deny.get("push"), 3);
+    assert.equal(report.guard.denyUnattended.get("push"), 1);
+    assert.equal(report.guard.ask.get("merge-rebase"), 1);
+    assert.equal(report.stopCheck.turns, 2);
+    assert.equal(report.stopCheck.findings, 5);
+    assert.deepEqual(report.patterns.map((p) => [p.source, p.rule, p.count, p.sessions]), [
+      ["guard", "push", 3, 2],
+      ["stop-check", "print() in application code (use logging)", 3, 1],
+      ["stop-check", "no calls to the Acme billing SDK", 2, 2], // ties with lint (2): more sessions wins
+    ]);
+    assert.match(report.patterns[0].hint, /agent\/<name>/);
+  });
+
+  it("anonymizes component names and project rules, not built-in rules", () => {
+    const text = JSON.stringify(toJson(anonymize(aggregate(fixture)), { days: 30 }));
+    assert.doesNotMatch(text, /payroll|Acme|"a"|"b"|"c"|"d"/);
+    assert.match(text, /component-1/);
+    assert.match(text, /project rule #1/);
+    assert.match(text, /print\(\) in application code/);
+    assert.match(text, /"anonymous":true/);
+  });
+
+  it("renders markdown with the patterns first and explains an empty period", () => {
+    const markdown = toMarkdown(aggregate(fixture), { days: 30 });
+    assert.ok(markdown.indexOf("## Most repeated patterns") < markdown.indexOf("## Guardrails"));
+    assert.match(markdown, /\| push \| 3 \|/);
+    assert.match(markdown, /Sessions: 4 \(2 unattended\)/);
+    assert.match(toMarkdown(aggregate([]), { days: 7 }), /No events in this period[\s\S]*CUADRILLA_METRICS=off/);
+  });
+
+  it("runs as a command and saves only under the metrics folder", () => {
+    const dir = tempDir();
+    writeFile(dir, ".claude/cuadrilla/metrics.jsonl", `${fixture.map((e) => JSON.stringify({ ...e, ts: new Date().toISOString() })).join("\n")}\n`);
+    const script = join(SCRIPTS, "..", "..", "skills", "report", "report.mjs");
+    const run = (...args) => spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: dir } });
+    const md = run("30", "anonymous", "--save");
+    assert.equal(md.status, 0, md.stderr);
+    assert.match(md.stdout, /Cuadrilla metrics report \(anonymous\)/);
+    assert.match(md.stdout, /Saved to .*\.claude[/\\]cuadrilla[/\\]reports[/\\]report-\d{4}-\d{2}-\d{2}-anonymous\.md/);
+    const json = JSON.parse(run("--json").stdout);
+    assert.equal(json.guard.deny.push, 3);
   });
 });

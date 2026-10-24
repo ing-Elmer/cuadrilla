@@ -53,7 +53,7 @@ It works with **any language**. Stack packs add deep, opinionated rules for Pyth
 
 | Plugin | What it adds |
 |---|---|
-| `cuadrilla` (core) | 8 agents (orchestrator, developer, reviewer, code-reviewer, security, qa, docs-writer, legacy-analyst) · 7 standard skills (core, architecture, API, data, testing, security, GitHub/CI) · 17 commands · 4 hooks · GitHub, Atlassian and Playwright MCP |
+| `cuadrilla` (core) | 8 agents (orchestrator, developer, reviewer, code-reviewer, security, qa, docs-writer, legacy-analyst) · 7 standard skills (core, architecture, API, data, testing, security, GitHub/CI) · 18 commands · 5 hooks · GitHub, Atlassian and Playwright MCP |
 | `cuadrilla-python-fastapi` | Python + FastAPI + PostgreSQL (psycopg 3, hand-written SQL, uv/ruff/mypy/pytest) |
 | `cuadrilla-dotnet` | .NET + ASP.NET Core (4 projects, Dapper or EF Core, FluentValidation, xUnit) |
 | `cuadrilla-node-typescript` | Node + TypeScript API (Fastify, Zod, pg/Kysely, Vitest) |
@@ -79,6 +79,7 @@ It works with **any language**. Stack packs add deep, opinionated rules for Pyth
 | `/cuadrilla:analyze-system <path>` | Survey a legacy system and write the migration report |
 | `/cuadrilla:find-skill <topic>` | Find, vet and install skills from skills.sh |
 | `/cuadrilla:doctor` | Diagnose tools, hooks, config, packs and MCP credentials |
+| `/cuadrilla:report [days] [anonymous]` | Local metrics: what the guard blocked, which forbidden patterns keep coming back, where lint fails, which agents are used — with the 3 most repeated patterns and a fix proposed for each |
 
 ### Hooks
 
@@ -88,6 +89,9 @@ It works with **any language**. Stack packs add deep, opinionated rules for Pyth
 | `format` | after every edit | Runs the component's formatter/linter from `cuadrilla.json` (or ruff / Prettier / gofmt by default) and feeds lint errors back to Claude. |
 | `stop-check` | before ending a turn | Scans added lines for forbidden patterns — built-in for Python, JS/TS, C#, Java/Kotlin, Go, Rust, plus each pack's and project's own — and hands the turn back once. |
 | `session-context` | session start | Branch, pending changes, profile/config status and the team's ground rules. |
+| `usage` | agent / skill calls, slash commands | Records which agents, skills and commands are used — names only, never prompts or arguments. |
+
+Every hook also writes to the local [metrics](#metrics).
 
 ## Install
 
@@ -152,6 +156,20 @@ What changes:
 
 Run it in a disposable container or VM with a clean clone, a fine-grained token limited to that
 repository (contents and pull requests), and branch protection on the base branch.
+
+## Metrics
+
+The hooks keep a local log in `.claude/cuadrilla/metrics.jsonl` of what gets in the team's way:
+which guard rule blocked or asked (by rule id), which forbidden patterns `stop-check` found (by
+pattern and file extension), how many lint problems each component had, and which agents, skills
+and commands were used. `/cuadrilla:report` turns it into a report and explains the three most
+repeated patterns with a concrete fix, so the standard improves with evidence.
+
+- **It never records** commands, prompts, task descriptions, code, file paths or secrets.
+- **It stays on the machine:** the folder ignores itself in git; nothing is sent anywhere.
+- `/cuadrilla:report 30 anonymous` also hides component names and project rules and drops session
+  ids, so the report can be shared with whoever maintains the kit.
+- Turn it off with `"metrics": false` in `.claude/cuadrilla.json` or `CUADRILLA_METRICS=off`.
 
 ## Security model
 

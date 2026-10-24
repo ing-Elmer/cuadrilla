@@ -9,7 +9,7 @@
 //    only run when configured.
 import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
-import { findUp, loadConfig, matchesGlob, projectRoot, readInput, relativePath, respond, run } from "./lib.mjs";
+import { findUp, loadConfig, matchesGlob, projectRoot, readInput, recordEvent, relativePath, respond, run } from "./lib.mjs";
 
 const input = await readInput();
 const file = input.tool_input?.file_path;
@@ -67,7 +67,7 @@ function fromConfig() {
     const result = runEntry(entry, cwd);
     if (!result.ok && !result.notFound) problems.push(...lintLines(result.output));
   }
-  return { handled: true, problems };
+  return { handled: true, problems, component: component.name ?? component.stack ?? "component" };
 }
 
 function builtinDefaults() {
@@ -99,6 +99,12 @@ const configured = fromConfig();
 const problems = configured ? configured.problems : builtinDefaults();
 
 if (problems.length) {
+  recordEvent(root, config, input, {
+    kind: "lint",
+    component: configured ? configured.component : "builtin",
+    ext: extension.replace(/^\./, ""),
+    problems: problems.length,
+  });
   respond({
     hookSpecificOutput: {
       hookEventName: "PostToolUse",

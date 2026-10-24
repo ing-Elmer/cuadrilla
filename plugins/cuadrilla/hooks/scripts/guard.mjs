@@ -21,6 +21,7 @@ import {
   loadConfig,
   projectRoot,
   readInput,
+  recordEvent,
   unattendedMode,
 } from "./lib.mjs";
 
@@ -34,32 +35,32 @@ const AGENT_PREFIX = agentBranchPrefix();
 const PUSH = new RegExp(`${GIT}push\\b`, "i");
 
 const DENY = [
-  [PUSH, "git push is not allowed: a person pushes."],
-  [new RegExp(`${GIT}reset\\b${SEG}--hard\\b`, "i"), "git reset --hard discards work irreversibly."],
-  [new RegExp(`${GIT}clean\\b${SEG}\\s-\\w*f`, "i"), "git clean -f deletes untracked files."],
-  [new RegExp(`${GIT}(?:filter-branch|filter-repo)\\b`, "i"), "Rewriting git history is not allowed."],
-  [new RegExp(`${GIT}checkout\\b${SEG}\\s--\\s+\\.(?:\\s|$)`, "i"), "git checkout -- . discards all local changes."],
-  [/--no-verify\b|\bcore\.hooksPath\b/i, "Git hooks are not skipped (--no-verify / core.hooksPath)."],
-  [/\brm\s+(?:-\w*\s+)*-\w*(?:r\w*f|f\w*r)\w*\b/i, "rm -rf is not allowed."],
-  [/\bRemove-Item\b[^|;&]*-Recurse\b/i, "Remove-Item -Recurse is not allowed."],
-  [/\b(?:rmdir|rd)\s+\/s\b|\bdel\s+\/s\b/i, "Recursive delete is not allowed."],
-  [/\bgh\s+pr\s+(?:merge|review|ready)\b/i, "Merging, approving or marking PRs ready is done by a person."],
-  [/\bgh\s+(?:secret|variable|release|ruleset)\b|\bgh\s+repo\s+(?:delete|edit|rename|archive)\b/i, "Repository settings are not changed by Claude."],
-  [/\bgh\s+api\b[^|;&]*(?:-X|--method)\s*(?:POST|PUT|PATCH|DELETE)\b/i, "gh api with write methods is not allowed."],
-  [/danger-full-access|dangerously-bypass-approvals-and-sandbox|--dangerously-skip-permissions|--yolo\b/i, "Agents are never run without a sandbox."],
-  [/\bprintenv\b|^\s*env\s*$|\b(?:Get-ChildItem|gci|dir|ls)\s+env:|\/proc\/[^\s]*\/environ|\[Environment\]::GetEnvironmentVariables|^\s*set\s*$|^\s*export\s+-p\s*$/im, "Environment variables are not dumped: they may hold secrets."],
-  [/\b(?:railway|vercel|netlify|fly|flyctl|heroku|firebase|amplify|wrangler|serverless|sls)\s+(?:up|deploy|redeploy|down|delete|destroy|remove|rm|promote)\b|\bvercel\s+--prod\b/i, "Deploys are done by CI/CD or a person."],
-  [/\b(?:az|aws|gcloud)\b[^|;&\n]*\s(?:delete|destroy|deploy|create|update|put|set-iam|add-iam|rm)\b/i, "Cloud resources are not changed by Claude."],
-  [/\bkubectl\s+(?:apply|delete|create|replace|patch|scale|rollout|edit|drain)\b|\bhelm\s+(?:install|upgrade|uninstall|rollback)\b/i, "Cluster changes are not made by Claude."],
-  [/\b(?:terraform|tofu|pulumi)\s+(?:apply|destroy|import|up)\b/i, "Infrastructure changes are applied by a person."],
-  [/\bdocker\s+(?:push|login)\b|\bdocker\s+system\s+prune\b/i, "Pushing images / docker login / prune are done by a person."],
-  [/\b(?:npm|pnpm|yarn)\s+publish\b|\btwine\s+upload\b|\buv\s+publish\b|\bdotnet\s+nuget\s+push\b|\bmvnw?\b[^|;&\n]*\bdeploy\b|\bcargo\s+publish\b|\bgradlew?\b[^|;&\n]*\bpublish\b/i, "Publishing packages is done by a person."],
+  [PUSH, "git push is not allowed: a person pushes.", "push"],
+  [new RegExp(`${GIT}reset\\b${SEG}--hard\\b`, "i"), "git reset --hard discards work irreversibly.", "reset-hard"],
+  [new RegExp(`${GIT}clean\\b${SEG}\\s-\\w*f`, "i"), "git clean -f deletes untracked files.", "clean-force"],
+  [new RegExp(`${GIT}(?:filter-branch|filter-repo)\\b`, "i"), "Rewriting git history is not allowed.", "history-rewrite"],
+  [new RegExp(`${GIT}checkout\\b${SEG}\\s--\\s+\\.(?:\\s|$)`, "i"), "git checkout -- . discards all local changes.", "discard-changes"],
+  [/--no-verify\b|\bcore\.hooksPath\b/i, "Git hooks are not skipped (--no-verify / core.hooksPath).", "skip-git-hooks"],
+  [/\brm\s+(?:-\w*\s+)*-\w*(?:r\w*f|f\w*r)\w*\b/i, "rm -rf is not allowed.", "recursive-delete"],
+  [/\bRemove-Item\b[^|;&]*-Recurse\b/i, "Remove-Item -Recurse is not allowed.", "recursive-delete"],
+  [/\b(?:rmdir|rd)\s+\/s\b|\bdel\s+\/s\b/i, "Recursive delete is not allowed.", "recursive-delete"],
+  [/\bgh\s+pr\s+(?:merge|review|ready)\b/i, "Merging, approving or marking PRs ready is done by a person.", "pr-merge-approve"],
+  [/\bgh\s+(?:secret|variable|release|ruleset)\b|\bgh\s+repo\s+(?:delete|edit|rename|archive)\b/i, "Repository settings are not changed by Claude.", "repo-settings"],
+  [/\bgh\s+api\b[^|;&]*(?:-X|--method)\s*(?:POST|PUT|PATCH|DELETE)\b/i, "gh api with write methods is not allowed.", "gh-api-write"],
+  [/danger-full-access|dangerously-bypass-approvals-and-sandbox|--dangerously-skip-permissions|--yolo\b/i, "Agents are never run without a sandbox.", "unsandboxed-agent"],
+  [/\bprintenv\b|^\s*env\s*$|\b(?:Get-ChildItem|gci|dir|ls)\s+env:|\/proc\/[^\s]*\/environ|\[Environment\]::GetEnvironmentVariables|^\s*set\s*$|^\s*export\s+-p\s*$/im, "Environment variables are not dumped: they may hold secrets.", "env-dump"],
+  [/\b(?:railway|vercel|netlify|fly|flyctl|heroku|firebase|amplify|wrangler|serverless|sls)\s+(?:up|deploy|redeploy|down|delete|destroy|remove|rm|promote)\b|\bvercel\s+--prod\b/i, "Deploys are done by CI/CD or a person.", "deploy"],
+  [/\b(?:az|aws|gcloud)\b[^|;&\n]*\s(?:delete|destroy|deploy|create|update|put|set-iam|add-iam|rm)\b/i, "Cloud resources are not changed by Claude.", "cloud-change"],
+  [/\bkubectl\s+(?:apply|delete|create|replace|patch|scale|rollout|edit|drain)\b|\bhelm\s+(?:install|upgrade|uninstall|rollback)\b/i, "Cluster changes are not made by Claude.", "cluster-change"],
+  [/\b(?:terraform|tofu|pulumi)\s+(?:apply|destroy|import|up)\b/i, "Infrastructure changes are applied by a person.", "iac-apply"],
+  [/\bdocker\s+(?:push|login)\b|\bdocker\s+system\s+prune\b/i, "Pushing images / docker login / prune are done by a person.", "docker-push"],
+  [/\b(?:npm|pnpm|yarn)\s+publish\b|\btwine\s+upload\b|\buv\s+publish\b|\bdotnet\s+nuget\s+push\b|\bmvnw?\b[^|;&\n]*\bdeploy\b|\bcargo\s+publish\b|\bgradlew?\b[^|;&\n]*\bpublish\b/i, "Publishing packages is done by a person.", "package-publish"],
 ];
 
 const ASK = [
-  [new RegExp(`${GIT}(?:merge|rebase)\\b(?!${SEG}--(?:abort|continue|quit))`, "i"), "merge/rebase: confirm this is not a shared branch (shared branches are integrated through PRs)."],
-  [/\b(?:alembic\s+(?:upgrade|downgrade)|dotnet\s+ef\s+database\s+(?:update|drop)|prisma\s+(?:migrate\s+(?:deploy|reset|dev)|db\s+(?:push|execute))|knex\s+migrate|sequelize\s+db:migrate|flyway\b[^|;&\n]*\b(?:migrate|clean)|liquibase\b[^|;&\n]*\bupdate|rails\s+db:|rake\s+db:|django-admin\s+migrate|manage\.py\s+migrate|goose\b[^|;&\n]*\bup|migrate\s+-path)/i, "This runs database migrations: it requires the user's explicit confirmation."],
-  [/\b(?:npm|pnpm|yarn)\s+[^|;&\n]*--force\b|\bnpm\s+audit\s+fix\b/i, "Forced installs / audit fix change many dependencies: confirm first."],
+  [new RegExp(`${GIT}(?:merge|rebase)\\b(?!${SEG}--(?:abort|continue|quit))`, "i"), "merge/rebase: confirm this is not a shared branch (shared branches are integrated through PRs).", "merge-rebase"],
+  [/\b(?:alembic\s+(?:upgrade|downgrade)|dotnet\s+ef\s+database\s+(?:update|drop)|prisma\s+(?:migrate\s+(?:deploy|reset|dev)|db\s+(?:push|execute))|knex\s+migrate|sequelize\s+db:migrate|flyway\b[^|;&\n]*\b(?:migrate|clean)|liquibase\b[^|;&\n]*\bupdate|rails\s+db:|rake\s+db:|django-admin\s+migrate|manage\.py\s+migrate|goose\b[^|;&\n]*\bup|migrate\s+-path)/i, "This runs database migrations: it requires the user's explicit confirmation.", "db-migration"],
+  [/\b(?:npm|pnpm|yarn)\s+[^|;&\n]*--force\b|\bnpm\s+audit\s+fix\b/i, "Forced installs / audit fix change many dependencies: confirm first.", "force-install"],
 ];
 
 const SQL_CLIENTS = /\b(?:psql|mysql|mariadb|sqlcmd|sqlplus|sqlite3|mongosh|mongo|redis-cli|cqlsh|bq\s+query|clickhouse-client)\b/i;
@@ -167,41 +168,49 @@ function isGitInternalsPath(path) {
   return typeof path === "string" && /(?:^|[/\\])\.git(?:[/\\]|$)/.test(path);
 }
 
+/** Records the decision (rule id and tool only, never the command or the file) and blocks. */
+function block(rule, reason) {
+  recordEvent(root, config, input, { kind: "guard", decision: "deny", rule, tool });
+  deny(reason);
+}
+
 /** With nobody to confirm, a confirmation request would hang the run: it becomes a deny. */
-function askOrDeny(reason) {
-  if (UNATTENDED) deny(`Blocked by cuadrilla guard (unattended mode, nobody can confirm): ${reason}`);
+function confirm(rule, reason) {
+  if (UNATTENDED) block(rule, `Blocked by cuadrilla guard (unattended mode, nobody can confirm): ${reason}`);
+  recordEvent(root, config, input, { kind: "guard", decision: "ask", rule, tool });
   ask(reason);
 }
 
 function checkCommand(original, protectedExtra) {
   const command = executableText(original);
   if (UNATTENDED && REMOTE_TAMPERING.some((pattern) => pattern.test(command) || pattern.test(original))) {
-    deny("Blocked by cuadrilla guard (unattended mode): git remotes, URL rewrites and git config are not changed, so the allowed push can only reach the original origin.");
+    block("remote-tampering", "Blocked by cuadrilla guard (unattended mode): git remotes, URL rewrites and git config are not changed, so the allowed push can only reach the original origin.");
   }
   const agentPush = UNATTENDED && isAllowedAgentPush(original);
-  for (const [pattern, reason] of DENY) {
+  for (const [pattern, reason, rule] of DENY) {
     if (pattern === PUSH && agentPush) continue;
     if (pattern.test(command)) {
       const hint =
         pattern === PUSH && UNATTENDED
           ? ` In unattended mode only \`git push [-u] origin ${AGENT_PREFIX}<name>\` is allowed, as a single command.`
           : "";
-      deny(`Blocked by cuadrilla guard: ${reason}${hint}`);
+      block(rule, `Blocked by cuadrilla guard: ${reason}${hint}`);
     }
   }
   if (UNATTENDED && /\bgh\s+pr\s+create\b/i.test(command) && !/\s(?:--draft|-d)\b/.test(command)) {
-    deny("Blocked by cuadrilla guard (unattended mode): pull requests are opened as drafts (`gh pr create --draft`) so a person reviews them.");
+    block("draft-pr-required", "Blocked by cuadrilla guard (unattended mode): pull requests are opened as drafts (`gh pr create --draft`) so a person reviews them.");
   }
   if (commandTouchesProtected(command, protectedExtra)) {
-    deny(
+    block(
+      "secret-file",
       "Blocked by cuadrilla guard: secret files (.env, keys, certificates, credentials) are not read or modified " +
         "through commands. Use the .example file to learn variable names.",
     );
   }
   if (SQL_CLIENTS.test(command) && (SQL_WRITE.test(original) || /\s(?:-f|-i|--file|<)\s*\S/.test(original))) {
-    askOrDeny("SQL against a database: requires the user's explicit confirmation.");
+    confirm("sql", "SQL against a database: requires the user's explicit confirmation.");
   }
-  for (const [pattern, reason] of ASK) if (pattern.test(command)) askOrDeny(reason);
+  for (const [pattern, reason, rule] of ASK) if (pattern.test(command)) confirm(rule, reason);
 }
 
 function findSecret(text) {
@@ -220,7 +229,8 @@ function findSecret(text) {
 }
 
 const input = await readInput();
-const { config } = loadConfig(projectRoot(input));
+const root = projectRoot(input);
+const { config } = loadConfig(root);
 const protectedExtra = Array.isArray(config.protectedPaths) ? config.protectedPaths : [];
 const tool = input.tool_name ?? "";
 const data = input.tool_input ?? {};
@@ -233,17 +243,18 @@ if (tool === "Bash" || tool === "PowerShell") {
       ? [data.path, data.glob]
       : [data.file_path, data.path, data.notebook_path, tool === "Glob" ? data.pattern : undefined];
   if (paths.some((p) => typeof p === "string" && isProtectedPath(p, protectedExtra))) {
-    deny("Blocked by cuadrilla guard: secret files are not read, searched or edited. Use the .example file.");
+    block("secret-file", "Blocked by cuadrilla guard: secret files are not read, searched or edited. Use the .example file.");
   }
   if (UNATTENDED && ["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(tool) && paths.some(isGitInternalsPath)) {
-    deny("Blocked by cuadrilla guard (unattended mode): files inside .git/ are not edited.");
+    block("git-internals", "Blocked by cuadrilla guard (unattended mode): files inside .git/ are not edited.");
   }
   if (tool === "Write" || tool === "Edit" || tool === "MultiEdit") {
     const texts = [data.content, data.new_string, ...(data.edits ?? []).map((edit) => edit?.new_string)];
     for (const text of texts) {
       const secret = findSecret(typeof text === "string" ? text : "");
       if (secret) {
-        deny(
+        block(
+          "secret-in-content",
           `Blocked by cuadrilla guard: the content looks like it contains a secret (${secret}). ` +
             "Secrets live in environment variables or a secret manager; the repo only holds names and fake values.",
         );

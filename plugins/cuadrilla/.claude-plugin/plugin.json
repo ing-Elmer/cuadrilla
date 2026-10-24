@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "cuadrilla",
   "displayName": "Cuadrilla",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "An engineering team of agents with a written standard: orchestrator, reviewers, security auditor, QA and docs, guardrail hooks and GitHub code review. Language-agnostic; add stack packs for deep rules.",
   "author": {
     "name": "Elmer Mejías"

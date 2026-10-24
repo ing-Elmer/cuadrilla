@@ -3,6 +3,26 @@
 All notable changes to cuadrilla are documented here. Versions follow semantic versioning; every
 plugin's `plugin.json` carries its own version.
 
+## 1.2.0 — local metrics and report
+
+### Core (`cuadrilla`)
+- **Local metrics** in `.claude/cuadrilla/metrics.jsonl`, so the standard improves with evidence:
+  - `guard` records every block and confirmation with a stable rule id (`push`, `secret-file`,
+    `db-migration`…) and the tool;
+  - `stop-check` records findings as counts by pattern, source (built-in or project) and file
+    extension;
+  - `format` records lint problems per component;
+  - `session-context` records session starts with their stacks;
+  - new `usage` hook records which agents, skills and slash commands are used.
+  Never records commands, prompts, task descriptions, code, file paths or secrets. The folder
+  ignores itself in git, the file rotates at 5 MB, and a metrics failure never changes a hook's
+  decision. Off with `"metrics": false` or `CUADRILLA_METRICS=off`.
+- **`/cuadrilla:report [days] [anonymous] [--save]`**: blocks, confirmations, findings, lint and
+  usage, with the three most repeated patterns explained and a concrete fix proposed for each.
+  `anonymous` hides component names and project rules and drops session ids.
+- `/cuadrilla:doctor` shows the metrics status and no longer counts its own sample guard check.
+- 19 new tests (169 total).
+
 ## 1.1.0 — unattended mode
 
 ### Core (`cuadrilla`)

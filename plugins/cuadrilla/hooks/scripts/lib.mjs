@@ -1,6 +1,6 @@
 // Shared helpers for cuadrilla hooks. No dependencies: Node >= 18 only.
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 export const CONFIG_PATH = join(".claude", "cuadrilla.json");
@@ -207,6 +207,56 @@ export function unattendedMode(env = process.env) {
 export function agentBranchPrefix(env = process.env) {
   const value = String(env.CUADRILLA_AGENT_BRANCH_PREFIX ?? "").trim();
   return /^[A-Za-z0-9][A-Za-z0-9._-]*\/$/.test(value) ? value : DEFAULT_AGENT_BRANCH_PREFIX;
+}
+
+// --- Metrics --------------------------------------------------------------------------------
+// Local, append-only telemetry so the team can see what keeps getting in its way: which guard
+// rules fire, which forbidden patterns come back, where lint fails, which agents and commands are
+// used. It never records commands, prompts, code, file paths or secrets — only rule ids, tool
+// and agent names, file extensions, component names and counts. It stays on the machine; the
+// folder ignores itself so it is never committed.
+
+export const METRICS_DIR = join(".claude", "cuadrilla");
+export const METRICS_FILE = join(METRICS_DIR, "metrics.jsonl");
+const METRICS_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Metrics are on unless CUADRILLA_METRICS is off/0/false/no or cuadrilla.json sets "metrics": false. */
+export function metricsEnabled(config = {}, env = process.env) {
+  if (/^(?:0|off|false|no)$/i.test(String(env.CUADRILLA_METRICS ?? "").trim())) return false;
+  return config.metrics !== false;
+}
+
+/**
+ * Appends one event to .claude/cuadrilla/metrics.jsonl. Never throws and never blocks a hook:
+ * a metrics problem must not change what the hook decides. Rotates to metrics.1.jsonl at 5 MB.
+ */
+export function recordEvent(root, config, input, event) {
+  try {
+    if (!root || !metricsEnabled(config)) return;
+    const dir = join(root, METRICS_DIR);
+    mkdirSync(dir, { recursive: true });
+    const ignore = join(dir, ".gitignore");
+    if (!existsSync(ignore)) writeFileSync(ignore, "# Local cuadrilla metrics: never committed.\n*\n");
+    const file = join(root, METRICS_FILE);
+    if (existsSync(file) && statSync(file).size > METRICS_MAX_BYTES) renameSync(file, join(dir, "metrics.1.jsonl"));
+    const line = {
+      v: 1,
+      ts: new Date().toISOString(),
+      session: typeof input?.session_id === "string" ? input.session_id : null,
+      unattended: unattendedMode(),
+      ...event,
+    };
+    appendFileSync(file, `${JSON.stringify(line)}\n`);
+  } catch {
+    // Metrics are best effort.
+  }
+}
+
+/** Lower-case file extension without the dot ("" when none) — the only file detail metrics keep. */
+export function fileExtension(path) {
+  const name = String(path ?? "").replace(/\\/g, "/").split("/").pop() ?? "";
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
 }
 
 /** Response language chosen when the plugin was enabled (or the project override). */

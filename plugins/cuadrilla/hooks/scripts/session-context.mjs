@@ -11,6 +11,7 @@ import {
   loadConfig,
   projectRoot,
   readInput,
+  recordEvent,
   respond,
   responseLanguage,
   unattendedMode,
@@ -90,5 +91,12 @@ if (unattendedMode()) {
     "- Never merge, approve or mark a PR as ready: a person reviews every change.",
   );
 }
+
+recordEvent(root, config, input, {
+  kind: "session",
+  source: typeof input.source === "string" ? input.source : null,
+  stacks: [...new Set((config.components ?? []).map((c) => c?.stack ?? "generic"))],
+  components: (config.components ?? []).length,
+});
 
 respond({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: lines.join("\n") } });
