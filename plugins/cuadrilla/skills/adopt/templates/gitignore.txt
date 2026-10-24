@@ -1,0 +1,34 @@
+# --- cuadrilla: secrets and local files ---
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.pfx
+*.p12
+.claude/settings.local.json
+CLAUDE.local.md
+
+# --- build outputs, dependencies and caches (keep the ones for your stacks) ---
+node_modules/
+dist/
+build/
+out/
+coverage/
+*.log
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+bin/
+obj/
+*.user
+TestResults/
+target/
+.gradle/
+vendor/
