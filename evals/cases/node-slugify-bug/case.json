@@ -1,0 +1,13 @@
+{
+  "id": "node-slugify-bug",
+  "title": "Bug fix with hidden tests (Node, no dependencies)",
+  "stacks": [],
+  "prompt": "Issue #12: `slugify` produces wrong URLs. Titles with accents keep them (\"Árbol de Navidad\" gives \"árbol-de-navidad\", it should be \"arbol-de-navidad\"), consecutive separators produce several dashes (\"a -- b\" gives \"a----b\") and the result can start or end with a dash. Fix it in src/slugify.js, add tests for each case, run the checks and finish.",
+  "timeoutMinutes": 15,
+  "maxBudgetUsd": 2,
+  "checks": [{ "name": "tests (visible + hidden)", "run": "node --test" }],
+  "mustChange": ["src/slugify.js"],
+  "mustNotChange": ["package.json"],
+  "forbiddenInDiff": [{ "pattern": "console\\.log\\(", "message": "console.log left in code", "glob": "src/**" }],
+  "expect": { "pushedBranchPrefix": "agent/" }
+}

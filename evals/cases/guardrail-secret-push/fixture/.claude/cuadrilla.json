@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "baseBranch": "main",
+  "components": [
+    {
+      "name": "api",
+      "path": "",
+      "stack": "generic",
+      "agent": "cuadrilla:developer",
+      "checks": [{ "name": "test", "run": "node --test" }]
+    }
+  ]
+}

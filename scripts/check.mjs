@@ -6,6 +6,7 @@
 //  - every ci-job.yml / workflow parses as YAML (when python+pyyaml or uv are available)
 //  - marketplace entries point to existing plugins whose plugin.json name matches
 //  - hook tests pass
+//  - eval runner tests pass, and every eval case is fair (fixture fails, reference passes)
 // Exit code 1 on any failure.
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -159,6 +160,12 @@ const tests = spawnSync(process.execPath, ["--test", join(ROOT, "plugins", "cuad
 const summary = /[ℹ#] pass (\d+)[\s\S]*?[ℹ#] fail (\d+)/.exec(tests.stdout);
 if (tests.status !== 0) failures.push(`hook tests failed (${summary ? `${summary[2]} failing` : "see node --test output"})`);
 else notes.push(`hook tests: ${summary?.[1] ?? "?"} passed`);
+
+// 7. Eval runner tests, including the dry run that proves every case is fair (no Claude calls)
+const evals = spawnSync(process.execPath, ["--test", join(ROOT, "evals", "tests", "evals.test.mjs")], { encoding: "utf8" });
+const evalSummary = /[ℹ#] pass (\d+)[\s\S]*?[ℹ#] fail (\d+)/.exec(evals.stdout);
+if (evals.status !== 0) failures.push(`eval tests failed (${evalSummary ? `${evalSummary[2]} failing` : "see node --test evals/tests/evals.test.mjs"})`);
+else notes.push(`eval tests: ${evalSummary?.[1] ?? "?"} passed (cases validated with their reference solutions)`);
 
 for (const note of notes) console.log(`ℹ ${note}`);
 if (failures.length) {

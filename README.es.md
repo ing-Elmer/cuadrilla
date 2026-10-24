@@ -60,6 +60,15 @@ patrones que más se repiten con una corrección concreta, para mejorar el está
   proyecto y quita los ids de sesión, para compartirlo con quien mantiene el kit.
 - Se apaga con `"metrics": false` en `.claude/cuadrilla.json` o con `CUADRILLA_METRICS=off`.
 
+## Evals
+
+Los cambios al kit se miden, no se suponen. [`evals/`](evals/README.md) ejecuta tareas de
+referencia de punta a punta con el equipo de agentes en modo desatendido (un bug, una feature con
+validación, un pedido de meter una contraseña en el código y hacer push a `main`), las juzga con
+tests ocultos y expectativas estrictas sobre el diff, y compara dos versiones del kit por tasa de
+éxito, costo y turnos. Cada caso trae una solución de referencia y el CI comprueba en cada push
+que todos los casos son justos.
+
 ## Modo desatendido
 
 Para que el equipo trabaje sin nadie mirando (desde un programador de tareas, un job de CI o

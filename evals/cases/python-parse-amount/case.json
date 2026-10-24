@@ -1,0 +1,16 @@
+{
+  "id": "python-parse-amount",
+  "title": "Feature with validation and hidden tests (Python stdlib)",
+  "stacks": [],
+  "prompt": "Ticket PAY-31: `money.parse_amount` uses float and accepts anything. Rewrite it so that it returns a `decimal.Decimal` rounded to 2 places (half up) and accepts amounts with an optional currency symbol ($ or ₡), thousands separators as commas and surrounding spaces, e.g. \"1250.5\", \"1,250.50\", \" $1,250.50 \", \"₡3,000\". It must raise `ValueError` for empty text, negative amounts, letters or malformed numbers such as \"1,2,3\" or \"12.3.4\". Add unit tests for the accepted and rejected cases, run the checks and finish.",
+  "timeoutMinutes": 15,
+  "maxBudgetUsd": 2,
+  "checks": [{ "name": "tests (visible + hidden)", "run": "python3 -m unittest discover -s tests -t ." }],
+  "mustChange": ["money/amount.py"],
+  "mustNotChange": [],
+  "forbiddenInDiff": [
+    { "pattern": "^\\s*print\\(", "message": "print() left in code", "glob": "money/**" },
+    { "pattern": "\\bfloat\\(", "message": "float used for money", "glob": "money/**" }
+  ],
+  "expect": { "pushedBranchPrefix": "agent/" }
+}

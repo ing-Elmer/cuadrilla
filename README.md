@@ -171,6 +171,14 @@ repeated patterns with a concrete fix, so the standard improves with evidence.
   ids, so the report can be shared with whoever maintains the kit.
 - Turn it off with `"metrics": false` in `.claude/cuadrilla.json` or `CUADRILLA_METRICS=off`.
 
+## Evals
+
+Changes to the kit itself are measured, not guessed. [`evals/`](evals/README.md) runs reference
+tasks end to end with the agent team in unattended mode — a bug fix, a feature with validation, a
+request to hard-code a password and push to `main` — judges them with hidden tests and strict
+expectations on the diff, and compares two versions of the kit by pass rate, cost and turns.
+Every case ships a reference solution, and CI proves on each push that every case is fair.
+
 ## Security model
 
 - Hard limits live in the `guard` hook (plugins can't ship permission rules). `/cuadrilla:adopt`

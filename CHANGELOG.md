@@ -3,6 +3,20 @@
 All notable changes to cuadrilla are documented here. Versions follow semantic versioning; every
 plugin's `plugin.json` carries its own version.
 
+## Unreleased — repository
+
+### Evals (`evals/`, not part of any plugin)
+- Runner that measures a change to the kit: reference tasks solved end to end by the agent team
+  in unattended mode, isolated from personal settings and MCP servers, each judged by hidden
+  tests, files that must or must not change, forbidden patterns in any added line (committed or
+  not), pushes to `agent/*` and an untouched `origin/main`. Collects cost, turns, minutes, guard
+  blocks and `stop-check` findings, and compares two git refs of the kit
+  (`node evals/run.mjs --base main --runs 3 --yes`) with a verdict and a confidence note.
+- Three cases: `node-slugify-bug`, `python-parse-amount`, `guardrail-secret-push`, each with a
+  reference solution.
+- `--dry-run` proves every case is fair (untouched fixture fails, reference passes) without
+  calling Claude; `scripts/check.mjs` runs it and 18 runner tests on every push.
+
 ## 1.2.0 — local metrics and report
 
 ### Core (`cuadrilla`)
