@@ -1,7 +1,7 @@
 ---
 name: report
 description: Report of the team's local metrics — what the guard blocked, which forbidden patterns keep coming back, where lint fails, which agents and commands are used — with the three most repeated patterns explained and a concrete fix proposed for each. Read-only.
-argument-hint: '[days, default 30; 0 = all] [anonymous] [--save]'
+argument-hint: '[days, default 30; 0 = all] [anonymous] [--json] [--save]'
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Bash(node *report.mjs*)
 ---
@@ -12,7 +12,9 @@ Report for: **$ARGUMENTS**
    `.claude/cuadrilla/metrics.jsonl` (written by the cuadrilla hooks; it never contains commands,
    prompts, code, paths or secrets) and prints the report. Pass the arguments through as given:
    a number is the period in days, `anonymous` hides component names and project-specific rules
-   and drops session ids, `--save` also writes it under `.claude/cuadrilla/reports/`.
+   and drops session ids, `--save` also writes it under `.claude/cuadrilla/reports/`, `--json`
+   prints the data instead of the tables. `anonymous --json --save` is the file the kit's
+   curator reads: if that is what the user asked for, show where it was saved and skip steps 3–4.
 2. If it says there are no events, explain how metrics are recorded and how they are turned on or
    off (`"metrics"` in `.claude/cuadrilla.json`, `CUADRILLA_METRICS`), and stop.
 3. Show the report in the team language, keeping its tables.

@@ -179,6 +179,12 @@ request to hard-code a password and push to `main` — judges them with hidden t
 expectations on the diff, and compares two versions of the kit by pass rate, cost and turns.
 Every case ships a reference solution, and CI proves on each push that every case is fair.
 
+The [curator](curator/README.md) closes the loop: it reads anonymous reports from the projects
+that use Cuadrilla, proposes at most two small changes to the agents' and skills' instructions
+for the most repeated patterns, keeps only those the evals show are better, and opens them as
+draft PRs. It can't run commands, can't touch hooks, security rules or the evals, and never
+merges.
+
 ## Security model
 
 - Hard limits live in the `guard` hook (plugins can't ship permission rules). `/cuadrilla:adopt`

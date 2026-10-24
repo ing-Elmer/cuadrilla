@@ -7,6 +7,7 @@
 //  - marketplace entries point to existing plugins whose plugin.json name matches
 //  - hook tests pass
 //  - eval runner tests pass, and every eval case is fair (fixture fails, reference passes)
+//  - curator tests pass
 // Exit code 1 on any failure.
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -166,6 +167,12 @@ const evals = spawnSync(process.execPath, ["--test", join(ROOT, "evals", "tests"
 const evalSummary = /[ℹ#] pass (\d+)[\s\S]*?[ℹ#] fail (\d+)/.exec(evals.stdout);
 if (evals.status !== 0) failures.push(`eval tests failed (${evalSummary ? `${evalSummary[2]} failing` : "see node --test evals/tests/evals.test.mjs"})`);
 else notes.push(`eval tests: ${evalSummary?.[1] ?? "?"} passed (cases validated with their reference solutions)`);
+
+// 8. Curator tests (fake Claude, simulated evals)
+const curator = spawnSync(process.execPath, ["--test", join(ROOT, "curator", "tests", "curator.test.mjs")], { encoding: "utf8" });
+const curatorSummary = /[ℹ#] pass (\d+)[\s\S]*?[ℹ#] fail (\d+)/.exec(curator.stdout);
+if (curator.status !== 0) failures.push(`curator tests failed (${curatorSummary ? `${curatorSummary[2]} failing` : "see node --test curator/tests/curator.test.mjs"})`);
+else notes.push(`curator tests: ${curatorSummary?.[1] ?? "?"} passed`);
 
 for (const note of notes) console.log(`ℹ ${note}`);
 if (failures.length) {

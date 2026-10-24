@@ -11,4 +11,6 @@ Issues and PRs are welcome.
   (`node evals/run.mjs --base main --runs 3 --yes`) and paste the summary in the PR. They cost
   real money, so CI doesn't run them; the free `--dry-run` runs on every push.
 - New behaviour worth protecting deserves an eval case, with a reference solution.
+- Curator PRs (`curator/*` branches) are proposals: review the evidence, the explanation and the
+  eval summary like any other PR, then merge or close. Commit `curator/history.json` after a run.
 - Keep prompts in English; user-facing language is set by the `response_language` option.

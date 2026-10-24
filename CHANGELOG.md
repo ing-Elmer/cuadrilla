@@ -17,6 +17,21 @@ plugin's `plugin.json` carries its own version.
 - `--dry-run` proves every case is fair (untouched fixture fails, reference passes) without
   calling Claude; `scripts/check.mjs` runs it and 18 runner tests on every push.
 
+### Curator (`curator/`, not part of any plugin)
+- Reads anonymous `/cuadrilla:report --json` files from projects, merges them and picks at most two
+  patterns seen in ≥ 2 projects or ≥ 10 times, with a 30-day cooldown per pattern (`history.json`).
+- For each, a Claude Code session with file tools only (no shell) proposes one change on a
+  `curator/<date>-<pattern>` branch. The real diff must stay within agents/skills Markdown, 3 files
+  and 60 lines; security agent and skills, hooks, evals, the curator, scripts, CI and license are
+  protected. Protective guard rules are never loosened.
+- The branch is evaluated against the base branch; only a better (or equal and cheaper) verdict
+  is kept, and with `--pr` it is pushed and opened as a draft PR with evidence, cause/change/risk
+  and the eval summary. It never merges. `--plan` previews for free.
+- 22 tests, including the real report → curator handoff; run by `scripts/check.mjs`.
+
+### Core
+- `/cuadrilla:report` documents `--json`, the format the curator reads.
+
 ## 1.2.0 — local metrics and report
 
 ### Core (`cuadrilla`)

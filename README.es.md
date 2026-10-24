@@ -69,6 +69,12 @@ tests ocultos y expectativas estrictas sobre el diff, y compara dos versiones de
 éxito, costo y turnos. Cada caso trae una solución de referencia y el CI comprueba en cada push
 que todos los casos son justos.
 
+El [curador](curator/README.md) cierra el ciclo: lee los informes anónimos de los proyectos que
+usan Cuadrilla, propone como máximo dos cambios pequeños a las instrucciones de agentes y skills
+para los patrones que más se repiten, conserva solo los que las evals muestran que mejoran y los
+abre como PRs en borrador. No puede ejecutar comandos, no toca hooks, reglas de seguridad ni
+evals, y nunca hace merge.
+
 ## Modo desatendido
 
 Para que el equipo trabaje sin nadie mirando (desde un programador de tareas, un job de CI o
