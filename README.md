@@ -98,7 +98,7 @@ Every hook also writes to the local [metrics](#metrics).
 Requirements: Claude Code, Node.js ≥ 18 (hooks), git. Optional: `gh`, Docker.
 
 ```text
-/plugin marketplace add <your-user>/cuadrilla         # the GitHub repo
+/plugin marketplace add ing-Elmer/cuadrilla          # the GitHub repo
 /plugin install cuadrilla@cuadrilla                      # choose the response language
 /plugin install cuadrilla-python-fastapi@cuadrilla       # the packs for your stacks
 /plugin install cuadrilla-react@cuadrilla
